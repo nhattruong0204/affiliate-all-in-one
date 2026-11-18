@@ -37,8 +37,15 @@ DOMAIN_FORBIDDEN="tokio async-std smol hyper axum reqwest sqlx leptos"
 fail=0
 err() { echo "ERROR: $*" >&2; fail=1; }
 
+# Capture into variables (not process substitution) so a failing cargo/jq aborts the script
+# under `set -e` instead of silently producing an empty list and a false "OK".
 meta=$(cargo metadata --format-version 1 --no-deps)
-mapfile -t crates < <(jq -r '.packages[].name' <<<"$meta" | sort)
+crate_names=$(jq -r '.packages[].name' <<<"$meta" | sort)
+mapfile -t crates <<<"$crate_names"
+if [[ ${#crates[@]} -eq 0 || -z "${crates[0]}" ]]; then
+  echo "ERROR: no workspace crates found; refusing to report success" >&2
+  exit 1
+fi
 
 for crate in "${crates[@]}"; do
   if [[ ! -v ALLOWED[$crate] ]]; then
@@ -46,7 +53,9 @@ for crate in "${crates[@]}"; do
     continue
   fi
 
-  # name, path-or-null, kind-or-null
+  # name, path-or-null, kind (normal|dev|build)
+  dep_lines=$(jq -r --arg c "$crate" \
+    '.packages[] | select(.name == $c) | .dependencies[] | "\(.name) \(.path) \(.kind // "normal")"' <<<"$meta")
   while read -r dep path kind; do
     [[ -z "$dep" ]] && continue
     if [[ "$path" != "null" ]]; then
@@ -69,8 +78,7 @@ for crate in "${crates[@]}"; do
         err "$crate depends on '$dep'; only [${ONLY_IN[$dep]}] may"
       fi
     fi
-  done < <(jq -r --arg c "$crate" \
-    '.packages[] | select(.name == $c) | .dependencies[] | "\(.name) \(.path) \(.kind)"' <<<"$meta")
+  done <<<"$dep_lines"
 done
 
 # Transitive purity of domain. Needs the resolved graph, so only run once direct checks pass.

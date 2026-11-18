@@ -76,6 +76,9 @@ sed 's/^name = "db"/name = "extra"/' "$root/crates/db/Cargo.toml" >"$tmp/ws/crat
 echo '' >"$tmp/ws/crates/extra/src/lib.rs"
 expect_fail "tenth crate without an ADR" "crate 'extra' is not in the crate map" deps
 
+fresh_copy; echo 'this is not toml' >"$tmp/ws/crates/db/Cargo.toml"
+expect_fail "unreadable manifest must fail closed, not report OK" 'failed|error' deps
+
 # --- SQL built with format! ------------------------------------------------------------
 sqlcheck() { "$root/scripts/check-no-sql-format.sh" "$tmp/sql"; }
 write_rs() { rm -rf "$tmp/sql"; mkdir -p "$tmp/sql"; printf '%s\n' "$1" >"$tmp/sql/x.rs"; }
