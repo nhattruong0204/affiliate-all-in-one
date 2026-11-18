@@ -15,7 +15,12 @@ for (const [path] of PAGES) {
       });
     });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-    page.on('console', (m) => m.type() === 'error' && problems.push(`console: ${m.text()}`));
+    // The 404 page's own status is logged by Chrome as a console error; subresource failures are
+    // caught by the response listener below, so only the document itself is excluded here.
+    const own = new URL(path, baseURL!).href;
+    page.on('console', (m) => {
+      if (m.type() === 'error' && m.location().url !== own) problems.push(`console: ${m.text()}`);
+    });
     page.on('requestfailed', (r) => problems.push(`request failed: ${r.url()}`));
     page.on('request', (r) => {
       if (new URL(r.url()).origin !== new URL(baseURL!).origin) problems.push(`external: ${r.url()}`);

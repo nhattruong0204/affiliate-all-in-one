@@ -111,7 +111,20 @@ fn html(status: StatusCode, body: String) -> Response {
         .into_response()
 }
 
+/// `/` is Vietnamese; a visitor who chose English earlier (`aao_lang=en`) is sent to `/en`.
+/// Crawlers send no cookie, so both versions stay indexable at their own URLs.
 async fn home(State(config): Config, headers: HeaderMap, uri: Uri) -> Response {
+    let cookie = headers.get(header::COOKIE).and_then(|v| v.to_str().ok());
+    if uri.path() == "/" && Locale::from_cookie_header(cookie) == Some(Locale::En) {
+        return (
+            [
+                (header::CACHE_CONTROL, "no-cache"),
+                (header::VARY, "Cookie"),
+            ],
+            Redirect::temporary("/en"),
+        )
+            .into_response();
+    }
     html(
         StatusCode::OK,
         pages::shell_preview(&context(&config, &headers, &uri)),
@@ -307,7 +320,7 @@ mod tests {
         );
         let (_, _, system) = fetch(SsrConfig::default(), "/", Some("aao_theme=bogus")).await;
         assert!(
-            !system.contains("data-theme"),
+            system.starts_with(r#"<!doctype html><html lang="vi"><head>"#),
             "an unknown value falls back to the OS preference: {system}"
         );
     }

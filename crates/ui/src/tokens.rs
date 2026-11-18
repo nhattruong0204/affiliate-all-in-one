@@ -93,7 +93,11 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
 fn colour_parser_reads_the_token_section() {
     let light = light();
     assert_eq!(light.get("bg"), Some(&[255, 255, 255]));
-    assert!(light.len() >= 25, "parsed only {} colour tokens", light.len());
+    assert!(
+        light.len() >= 25,
+        "parsed only {} colour tokens",
+        light.len()
+    );
 }
 
 #[test]
