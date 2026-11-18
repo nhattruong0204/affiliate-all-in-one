@@ -29,7 +29,9 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| DEFAULT_BIND.to_owned())
         .parse()
         .context("WEB_BIND must be a socket address such as 127.0.0.1:8080")?;
-    let config = SsrConfig::from_lookup(lookup).context("invalid web configuration")?;
+    let config = SsrConfig::from_lookup(lookup)
+        .map_err(anyhow::Error::msg)
+        .context("invalid web configuration")?;
 
     let listener = tokio::net::TcpListener::bind(bind)
         .await
