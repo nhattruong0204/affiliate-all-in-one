@@ -1,0 +1,17 @@
+[package]
+name = "app"
+description = "Application services and use-cases, authorization, policies, telemetry setup."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+domain = { workspace = true }
+db = { workspace = true }
+ledger = { workspace = true }
+affiliate = { workspace = true }

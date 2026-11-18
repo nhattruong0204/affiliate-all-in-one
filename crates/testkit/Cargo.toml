@@ -1,0 +1,18 @@
+[package]
+name = "testkit"
+description = "Dev-only test support: Postgres containers, fixtures, provider mocks, property generators."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+domain = { workspace = true }
+db = { workspace = true }
+ledger = { workspace = true }
+affiliate = { workspace = true }
+app = { workspace = true }

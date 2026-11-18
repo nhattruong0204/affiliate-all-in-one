@@ -1,0 +1,11 @@
+[package]
+name = "domain"
+description = "Pure domain types and rules: Money, Bps, IDs, state machines, commission calculation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

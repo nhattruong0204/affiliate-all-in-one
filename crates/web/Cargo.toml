@@ -1,0 +1,16 @@
+[package]
+name = "web"
+description = "Axum web server binary: router, handlers, sessions, CSRF, webhooks, OpenAPI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+app = { workspace = true }
+ui = { workspace = true }
+domain = { workspace = true }

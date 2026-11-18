@@ -1,6 +1,6 @@
 # Project Status
 
-**Phase:** Architecture review. No production code. Last updated 2026-11-18 (re-planned into incremental releases, ADR-0015).
+**Phase:** Architecture approved (PR #52 merged 2026-11-18); V0.1 implementation started with AAO-001. Last updated 2026-11-18.
 
 ## 1. Executive summary
 
@@ -109,3 +109,4 @@ L = likelihood, I = impact (H/M/L).
 |---|---|---|---|---|
 | 2026-11-17 | Claude Opus 5.5 (acting as Principal Architect) | `docs/architecture-v1` | Architecture package + backlog written; PR opened; GitHub issues created | Owner review of PR; decisions D-1…D-12; start OB-1…OB-6 |
 | 2026-11-18 | Claude Opus 5.5 (acting as CTO/Architect) | `docs/architecture-v1` | Re-planned into V0.1/V0.5/V1.0/V1.x (ADR-0015, RELEASE_PLAN.md); added AAO-100 (#53); relabelled and re-milestoned all 52 issues; 5 dependency edits; reasoning effort reassessed | Owner approves PR + D-4/D-6 so G-0.1 work can start; Sonnet starts #1 |
+| 2026-11-18 | Claude Sonnet 5.5 | `feat/AAO-001-workspace-skeleton` (#1) | Workspace skeleton, toolchain pin, lints, guard-rail scripts + self-test, justfile, compose.dev.yml, CODEOWNERS, PR template, `deny.toml`, `ci.yml` written; local fmt/clippy/build/arch-checks/gitleaks pass. `deny`, `audit`, `nextest` could not run in the sandbox (no network/tools); CI is the first real run | Owner: review/merge, then set branch protection (D-12: require `lint`, `test`, `supply-chain`, `secrets`; code-owner review). Next: AAO-003, AAO-021, AAO-014, AAO-004 can start once merged |

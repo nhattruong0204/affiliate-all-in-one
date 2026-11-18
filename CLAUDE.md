@@ -6,7 +6,7 @@ Read `AGENTS.md` first; it is the binding rule set. This file is the short orien
 Cashback platform for Vietnam (VND, `Asia/Ho_Chi_Minh`, Vietnamese default, English secondary). Revenue = affiliate commission; users get a configurable share. Reference product: hoantien.com (parity of public workflows, original implementation and branding).
 
 ## Current phase
-Architecture under owner review. **Do not write production code until the architecture PR is approved** and an issue from `docs/ENGINEERING_BACKLOG.md` is assigned to you.
+Architecture approved (PR #52 merged 2026-11-18). Implementation proceeds release by release (`docs/RELEASE_PLAN.md`). **Only work on an issue assigned to you** whose dependencies are merged; one issue per PR. Workspace skeleton and CI (AAO-001) are in place.
 Delivery is incremental (V0.1 → V0.5 → V1.0 → V1.x, see `docs/RELEASE_PLAN.md`). Build for the issue's release only. Money and attribution features must stay behind their flags until the release gate passes.
 
 ## Hard rules (summary)
@@ -27,13 +27,15 @@ Delivery is incremental (V0.1 → V0.5 → V1.0 → V1.x, see `docs/RELEASE_PLAN
 - Provider facts: `docs/AFFILIATE_PROVIDER_MATRIX.md`
 - Open owner decisions: `docs/PROJECT_STATUS.md` §4
 
-## Commands (once AAO-001 lands)
+## Commands
 ```
-just dev        # compose up postgres, run web + worker with watch
-just test       # cargo nextest + sqlx offline check
-just lint       # fmt --check, clippy -D warnings, cargo deny, cargo audit
-just e2e        # Playwright against local stack
+just dev          # compose up postgres, run web + worker with watch (needs cargo-watch)
+just test         # cargo nextest + doctests + sqlx offline check
+just lint         # fmt --check, clippy -D warnings, arch-checks, cargo deny, cargo audit
+just arch-checks  # dependency-direction check, no string-built SQL, and their self-tests
+just e2e          # Playwright against local stack (suite arrives with AAO-100)
 ```
+Tooling: `just`, `cargo-nextest`, `cargo-deny`, `cargo-audit`, `jq`, `perl`, Docker. CI installs pinned versions (`.github/workflows/ci.yml`).
 
 ## When unsure
 Stop and write the question into the PR description under "Owner decision needed". Do not guess on money, legal, or provider behaviour.
