@@ -1,0 +1,36 @@
+# Feature Parity Matrix
+
+Reference: hoantien.com, accessed 2026-11-17. Status = evidence for the *reference behaviour*: VERIFIED / INFERRED / UNKNOWN. Features we add beyond evidence are PROPOSED. Priority: P0 = V1 launch blocker, P1 = V1.x, P2 = later.
+
+| ID | Feature | Ref URL | Observed behaviour | User journey | Backend | Frontend | Pri | Depends on | Acceptance criteria | Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| F-01 | Landing + nav | `/` | Hero with paste field, how-it-works, rules, FAQ-like notes, footer | Visitor lands → understands → pastes link | SSR page, content config | Responsive hero, nav, footer | P0 | — | LCP < 2.5s on 4G mid-range Android; works without JS for reading | VERIFIED |
+| F-02 | Product URL submission | `/` | One input accepting Shopee/TikTok Shop links | Paste → submit | URL parse, merchant detect, safe resolve of short links | Input with paste button, validation states | P0 | F-01 | Accepts full, short, and "text containing URL" inputs for enabled merchants; rejects others with a clear message | VERIFIED (input); accepted formats INFERRED |
+| F-03 | Product preview | `/` | Demo shows product, price, rate, expected cashback | See what you will earn | Product metadata lookup + cache; capability-aware (may be absent) | Preview card with skeleton + "no preview" fallback | P0 | F-02 | Preview shown when provider returns metadata; link still generated when not | INFERRED |
+| F-04 | Cashback estimate | `/` | Rate % and expected đ amount | Decide to buy | Rule engine: commission estimate × share, versioned | Amount labelled "ước tính" with tooltip | P0 | F-03, rules | Estimate reproducible from stored rule version; never labelled guaranteed | VERIFIED (demo) |
+| F-05 | Affiliate link generation | `/` | CTA generates cashback link | Tap "get link" | Provider routing → tracking link with opaque click id | Result screen: open app / copy | P0 | F-02, gateway | Link carries our click id; click row persisted before redirect | VERIFIED (exists); mechanism UNKNOWN |
+| F-06 | Mobile app redirection | — | Not publicly described | Tap → merchant app opens | `/go/{click}` 302 to provider link | Open-app button, in-app-browser guidance, desktop fallback | P0 | F-05 | Opens Shopee/TikTok app on iOS Safari and Android Chrome when installed; web fallback otherwise | UNKNOWN |
+| F-07 | Email registration | `/register` | Name, email, optional phone, password ×2, consent, Google | Sign up | Argon2id, email verification, consent record | Form + validation | P0 | — | Unverified email cannot withdraw; consent version stored | VERIFIED (form); email verification step UNKNOWN |
+| F-08 | Login + remember me | `/login` | Email/password, remember, forgot password | Sign in | Sessions, rate limiting, lockout | Form | P0 | F-07 | Generic error on bad credentials; throttled | VERIFIED |
+| F-09 | Google Sign-In | `/auth/google` | "Continue with Google" | One tap sign in | OIDC code flow + PKCE, account linking by verified email | Button | P0 | F-07 | State/nonce verified; unverified Google email rejected | VERIFIED |
+| F-10 | Password recovery | `/forgot-password` | Link exists | Reset | Single-use token, expiry, session revocation | Request + reset pages | P0 | F-07 | Response identical whether or not email exists | VERIFIED (link) |
+| F-11 | User dashboard | `/dashboard` | "Ví" entry point | See balances and recent activity | Balance read model from ledger | Summary cards, recent orders | P0 | ledger | Totals equal ledger account balances | UNKNOWN (layout) |
+| F-12 | Order history | — | Homepage says orders appear in wallet history | Track an order | Orders/conversions query, pagination | List + detail with per-order timeline | P0 | ingestion | Each status maps to a documented state | INFERRED |
+| F-13 | Wallet + transactions | — | Balances withdrawable after reconciliation | Understand money | Ledger-derived statement | Balance breakdown + statement | P0 | ledger | Pending / approved / available / reserved / paid shown separately | INFERRED |
+| F-14 | Withdrawal | ToS | Min 50,000đ; bank or MoMo; own-name; 1–24 working hours | Cash out | Reserve → review → manual payout → reconcile | Request form, history | P0 | F-13, F-15 | Double-submit cannot reserve twice; min/limits from config | VERIFIED (rules); UI UNKNOWN |
+| F-15 | Bank account settings | ToS | Own-name account required | Save payout destination | Encrypted storage, name match, change cooldown | CRUD + VietQR bank picker | P0 | F-07 | Change triggers step-up + cooldown | INFERRED |
+| F-16 | Referral (1 level) | ToS | Bonus on referee's reconciled order; referee not reduced | Invite friend | Attribution, anti-abuse, ledger reward | Referral dashboard, share link | P1 | ledger | No self/circular referral; reward only on funded order | VERIFIED (rule); rates UNKNOWN |
+| F-17 | Multi-level referral (F2) | blog | Slug mentions F1/F2; ToS says none | — | Schema-capable, **flag hard-off** | None | — | legal review | Cannot be enabled without owner + legal flag | INFERRED |
+| F-18 | Daily check-in | `/ranking` meta | Streaks referenced | Tap daily | Idempotent per user/day (VN day), reward via ledger promo budget | Check-in widget | P1 | ledger | One check-in per VN calendar day; budget-capped | INFERRED |
+| F-19 | Leaderboard | `/ranking` | Disabled by admin | View ranks | Periodic materialized ranks, masked names | Table | P2 | F-12 | Flag-gated; names masked | VERIFIED (disabled) |
+| F-20 | Notifications | privacy | Transactional emails mentioned | Get updates | Outbox → email; in-app list | Bell + list | P1 | outbox | Order/withdrawal events produce exactly one notification | INFERRED |
+| F-21 | Blog + SEO | `/blog` | Categories, tags, featured, search, views | Read guides | Content tables, slugs, sitemap | SSR list/detail, meta, JSON-LD | P1 | admin CMS | Valid sitemap + canonical; Lighthouse SEO ≥ 95 | VERIFIED |
+| F-22 | Dark / light theme | `/` | Toggle | Switch | — | Token-based themes, persisted, no flash | P0 | design tokens | Respects `prefers-color-scheme`; AA contrast both modes | VERIFIED |
+| F-23 | vi / en | `/change-language/*` | Switch | Switch | Locale in session/cookie | i18n catalog | P0 | — | No untranslated keys in CI | VERIFIED |
+| F-24 | PWA | `/` meta | Web-app-capable meta | Install | Manifest, service worker (static only) | Install prompt | P1 | — | Installable; authenticated pages never cached | VERIFIED (meta only) |
+| F-25 | Support channels | `/` | Email, hotline, Zalo, Messenger | Get help | Config | Contact bar | P0 | — | Links configurable in admin | VERIFIED |
+| F-26 | Missing cashback claim | blog | No public flow | Report missing order | Ticket + evidence + reconciliation link | Form, ticket status | P1 | ingestion | Ticket links to click and, when found, the conversion | UNKNOWN (PROPOSED design) |
+| F-27 | ToS + privacy | `/page/*` | Present; thin | Read | Versioned legal docs | Pages + consent | P0 | legal | Entity, retention, rights disclosed; consent versioned | VERIFIED |
+| F-28 | Purchase rules guidance | `/` | 5 rules listed | Avoid losing cashback | Config content | Checklist on result screen | P0 | F-05 | Shown before redirect | VERIFIED |
+
+Coverage of V1 (P0) rows by backlog issues is tracked in `ENGINEERING_BACKLOG.md` §5.
