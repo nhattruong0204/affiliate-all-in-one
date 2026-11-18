@@ -68,7 +68,6 @@ impl SsrConfig {
 }
 
 /// The router for every page and asset this crate serves.
-#[must_use]
 pub fn router(config: SsrConfig) -> Router {
     Router::new()
         .route("/", get(home))
@@ -189,7 +188,7 @@ async fn asset(Path(path): Path<String>, RawQuery(query): RawQuery) -> Response 
 }
 
 /// Everything is first-party: no third-party origins, no inline script or style, no `data:`
-/// images, no framing. Loosening any of this needs a security review (docs/SECURITY_THREAT_MODEL.md).
+/// images, no framing. Loosening any of this needs a security review (`docs/SECURITY_THREAT_MODEL.md`).
 const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
 font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; \
 form-action 'self'; frame-ancestors 'none'";
