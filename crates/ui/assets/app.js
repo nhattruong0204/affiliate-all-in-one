@@ -4,7 +4,7 @@
  *
  *  - Theme toggle: sets the `aao_theme` cookie + <html data-theme>. The server reads the cookie, so
  *    the next page load is correct before first paint.
- *  - Language links: remember the choice in `aao_lang` (the server redirects `/` accordingly).
+ *  - Language links: remember the choice in `aao_lang` (the server sends `/` to `/en` when it is `en`).
  *  - Toasts: window.AAO.toast({ kind, message, title?, timeout? }); server-rendered toasts get
  *    the same dismiss behaviour.
  *  - Submit guard: forms marked data-submit-guard disable double submission.

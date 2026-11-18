@@ -1,6 +1,6 @@
 //! Design system and page rendering for Affiliate All-in-One.
 //!
-//! V0.1 scope (AAO-014): tokens, AppShell, navigation, theme, vi/en, base components, loading /
+//! V0.1 scope (AAO-014): tokens, `AppShell`, navigation, theme, vi/en, base components, loading /
 //! empty / error states and toasts. Business pages (landing, analyzer, wallet …) build on these in
 //! their own issues. See `docs/UI_FOUNDATIONS.md` for usage and conventions.
 //!

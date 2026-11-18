@@ -211,8 +211,12 @@ mod tests {
             html.contains("required") && html.contains(r#"autocomplete="email""#),
             "{html}"
         );
+        let star = html
+            .split("<span")
+            .find(|part| part.contains("field-required"))
+            .unwrap_or_default();
         assert!(
-            html.contains(r#"aria-hidden="true">*"#),
+            star.contains(r#"aria-hidden="true""#),
             "asterisk must be decorative: {html}"
         );
     }

@@ -15,7 +15,7 @@ use axum::extract::{Path, RawQuery, Request, State};
 use axum::http::header::{self, HeaderName};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri};
 use axum::middleware::{self, Next};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::get;
 use ui::i18n::neutral_path;
 use ui::{Locale, PageContext, Theme, assets, pages};
@@ -272,6 +272,24 @@ mod tests {
         assert!(
             body.contains(r#"<html lang="en">"#) && body.contains("Under construction"),
             "{body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn root_redirects_to_english_only_for_a_remembered_choice() {
+        let (status, headers, _) = fetch(SsrConfig::default(), "/", Some("aao_lang=en")).await;
+        assert_eq!(status, StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(header_value(&headers, "location"), "/en");
+        assert_eq!(header_value(&headers, "vary"), "Cookie");
+        for cookie in [Some("aao_lang=vi"), Some("aao_lang=fr"), None] {
+            let (status, _, _) = fetch(SsrConfig::default(), "/", cookie).await;
+            assert_eq!(status, StatusCode::OK, "{cookie:?}");
+        }
+        let (status, _, _) = fetch(SsrConfig::default(), "/en", Some("aao_lang=vi")).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "explicit /en is never redirected back"
         );
     }
 

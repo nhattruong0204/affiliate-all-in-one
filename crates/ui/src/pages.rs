@@ -300,7 +300,7 @@ mod tests {
             );
             assert_eq!(html.matches("<h1").count(), 1, "exactly one h1: {html}");
             assert!(
-                !html.contains('₫') && !html.contains("%"),
+                !html.contains('₫') && !html.contains('%'),
                 "no amounts or rates on the preview: {html}"
             );
         }
@@ -332,9 +332,10 @@ mod tests {
             assert!(html.contains(needle), "gallery is missing {needle}");
         }
         assert_eq!(html.matches("<h1").count(), 1);
-        let ids: Vec<_> = html
-            .match_indices(" id=\"")
-            .map(|(i, _)| &html[i..i + 40])
+        let ids: Vec<&str> = html
+            .split(" id=\"")
+            .skip(1)
+            .filter_map(|rest| rest.split_once('"').map(|(id, _)| id))
             .collect();
         let mut sorted = ids.clone();
         sorted.sort_unstable();

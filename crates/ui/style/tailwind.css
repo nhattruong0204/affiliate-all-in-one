@@ -12,7 +12,7 @@
  *    checks WCAG contrast for every text/background pair.
  *  - No inline styles and no `url(data:)`: the page must run under a strict CSP.
  */
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 
 @source "../src";
 @source "../assets/app.js";

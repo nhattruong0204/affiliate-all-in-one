@@ -2,6 +2,8 @@
 //! theme attributes. Built as a string with explicit escaping: the head is small, fixed in shape
 //! and must stay free of inline scripts/styles (strict CSP).
 
+use std::fmt::Write as _;
+
 use crate::assets::{APP_CSS, APP_JS, FAVICON, FONT_REGULAR, FONT_SEMIBOLD};
 use crate::i18n::{Locale, localize_path};
 use crate::theme::Theme;
@@ -67,11 +69,12 @@ pub fn render_document(
     let mut head = String::with_capacity(1024);
     head.push_str(r#"<meta charset="utf-8">"#);
     head.push_str(r#"<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">"#);
-    head.push_str(&format!("<title>{}</title>", escape(title)));
-    head.push_str(&format!(
+    let _ = write!(head, "<title>{}</title>", escape(title));
+    let _ = write!(
+        head,
         r#"<meta name="description" content="{}">"#,
         escape(description)
-    ));
+    );
     head.push_str(r#"<meta name="color-scheme" content="light dark">"#);
     head.push_str(
         r##"<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">"##,
@@ -85,42 +88,41 @@ pub fn render_document(
     if let Some(base) = &ctx.base_url {
         let base = base.trim_end_matches('/');
         let canonical = format!("{base}{}", localize_path(ctx.locale, &ctx.path));
-        head.push_str(&format!(
+        let _ = write!(
+            head,
             r#"<link rel="canonical" href="{}">"#,
             escape(&canonical)
-        ));
+        );
         for l in Locale::ALL {
             let href = format!("{base}{}", localize_path(l, &ctx.path));
-            head.push_str(&format!(
+            let _ = write!(
+                head,
                 r#"<link rel="alternate" hreflang="{}" href="{}">"#,
                 l.code(),
                 escape(&href)
-            ));
+            );
         }
         let default = format!("{base}{}", localize_path(Locale::Vi, &ctx.path));
-        head.push_str(&format!(
+        let _ = write!(
+            head,
             r#"<link rel="alternate" hreflang="x-default" href="{}">"#,
             escape(&default)
-        ));
+        );
     }
-    head.push_str(&format!(
+    let _ = write!(
+        head,
         r#"<link rel="icon" href="{}" type="image/svg+xml">"#,
         FAVICON.url()
-    ));
+    );
     for font in [FONT_REGULAR, FONT_SEMIBOLD] {
-        head.push_str(&format!(
+        let _ = write!(
+            head,
             r#"<link rel="preload" href="{}" as="font" type="font/woff" crossorigin>"#,
             font.url()
-        ));
+        );
     }
-    head.push_str(&format!(
-        r#"<link rel="stylesheet" href="{}">"#,
-        APP_CSS.url()
-    ));
-    head.push_str(&format!(
-        r#"<script src="{}" defer></script>"#,
-        APP_JS.url()
-    ));
+    let _ = write!(head, r#"<link rel="stylesheet" href="{}">"#, APP_CSS.url());
+    let _ = write!(head, r#"<script src="{}" defer></script>"#, APP_JS.url());
 
     format!(
         r#"<!doctype html><html lang="{lang}"{theme_attr}><head>{head}</head><body>{body_html}</body></html>"#

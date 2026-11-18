@@ -44,6 +44,8 @@ fn classes(variant: ButtonVariant, size: ButtonSize, block: bool, extra: &str) -
 ///
 /// `loading` shows a spinner and sets `aria-busy`; pair forms with `data-submit-guard` so a second
 /// click cannot resubmit.
+// Four independent state flags mirror the HTML attributes; an enum would only obscure call sites.
+#[allow(clippy::fn_params_excessive_bools)]
 #[component]
 pub fn Button(
     #[prop(optional)] variant: ButtonVariant,

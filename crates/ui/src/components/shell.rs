@@ -261,6 +261,6 @@ mod tests {
                 && html.contains(r#"href="/en/chinh-sach-bao-mat""#),
             "{html}"
         );
-        assert!(html.contains(r#"data-toast-region"#), "{html}");
+        assert!(html.contains("data-toast-region"), "{html}");
     }
 }

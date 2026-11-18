@@ -9,6 +9,8 @@
 /docs/COMPLIANCE_CHECKLIST.md        @nhattruong0204
 /AGENTS.md                           @nhattruong0204
 /deny.toml                           @nhattruong0204
+/.cargo/audit.toml                   @nhattruong0204
+/scripts/install-tailwind.sh         @nhattruong0204
 /scripts/check-deps.sh               @nhattruong0204
 /scripts/check-no-sql-format.sh      @nhattruong0204
 /scripts/tests/                      @nhattruong0204
