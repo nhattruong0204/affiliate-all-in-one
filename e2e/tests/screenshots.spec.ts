@@ -3,6 +3,8 @@ import { setThemeCookie, type Theme } from './helpers';
 
 // Evidence for the PR (desktop + mobile, light + dark). Only runs with SCREENSHOTS=1.
 test.skip(!process.env.SCREENSHOTS, 'set SCREENSHOTS=1 to capture');
+// JPEG at 1x keeps the artifact small enough to review (and commit) comfortably.
+test.use({ deviceScaleFactor: 1 });
 
 const dir = process.env.SCREENSHOT_DIR ?? 'screenshots';
 const shots: ReadonlyArray<readonly [string, string, boolean]> = [
@@ -19,7 +21,9 @@ for (const theme of ['light', 'dark'] as Theme[]) {
       await page.goto(path);
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({
-        path: `${dir}/${info.project.name}-${theme}-${name}.png`,
+        path: `${dir}/${info.project.name}-${theme}-${name}.jpg`,
+        type: 'jpeg',
+        quality: 82,
         fullPage,
         animations: 'disabled',
       });
@@ -32,6 +36,11 @@ for (const theme of ['light', 'dark'] as Theme[]) {
     for (const kind of ['success', 'warning', 'error'])
       await page.locator(`[data-toast-demo="${kind}"]`).click();
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: `${dir}/${info.project.name}-${theme}-toasts.png`, animations: 'disabled' });
+    await page.screenshot({
+      path: `${dir}/${info.project.name}-${theme}-toasts.jpg`,
+      type: 'jpeg',
+      quality: 82,
+      animations: 'disabled',
+    });
   });
 }
