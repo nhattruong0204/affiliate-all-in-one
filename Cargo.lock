@@ -70,4 +70,5 @@ version = "0.0.0"
 dependencies = [
  "app",
  "domain",
+ "ledger",
 ]
