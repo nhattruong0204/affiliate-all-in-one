@@ -203,7 +203,7 @@
     scroll-padding-top: 5rem;
   }
   body {
-    @apply bg-bg font-sans text-body text-text antialiased;
+    @apply flex min-h-dvh flex-col bg-bg font-sans text-body text-text antialiased;
     font-feature-settings: "kern", "liga";
   }
   :where(a) {
@@ -259,7 +259,7 @@
     @apply flex items-center gap-2;
   }
   .page-main {
-    @apply min-h-[60vh] py-8 pb-[calc(var(--bottom-nav-h,0px)+2rem)] sm:py-12 lg:pb-12;
+    @apply flex-1 py-8 pb-[calc(var(--bottom-nav-h,0px)+2rem)] sm:py-12 lg:pb-12;
     --bottom-nav-h: 4.25rem;
   }
   @media (min-width: 1024px) {
