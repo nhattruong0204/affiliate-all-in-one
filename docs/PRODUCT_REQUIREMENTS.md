@@ -27,6 +27,8 @@ Share is resolved by a versioned rule matched on provider, merchant, campaign, c
 | Đã huỷ (reversed) | Cancelled/returned/rejected | — |
 
 ## 4. V1 scope
+
+> Delivery is split into V0.1 Public Website Preview → V0.5 Private Alpha → V1.0 Commercial → V1.x Growth. Release mapping and gates: `RELEASE_PLAN.md`. The scope below is the V1.0 target.
 **In:** landing; link analyzer; preview + estimate; link generation via ACCESSTRADE for Shopee and TikTok Shop (subject to campaign approval); click tracking; conversion polling; order history; ledger wallet; manual-review withdrawals to bank; bank account settings; email/password + Google auth; vi/en; dark/light; ToS/privacy; support links; purchase rules; admin console (users, providers, campaigns, rules, conversions, ledger view, withdrawals, audit log, flags).
 
 **V1.x:** single-level referral, daily check-in, notifications centre, blog CMS, PWA install, missing-cashback tickets.

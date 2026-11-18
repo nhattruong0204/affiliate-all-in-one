@@ -7,6 +7,7 @@ Cashback platform for Vietnam (VND, `Asia/Ho_Chi_Minh`, Vietnamese default, Engl
 
 ## Current phase
 Architecture under owner review. **Do not write production code until the architecture PR is approved** and an issue from `docs/ENGINEERING_BACKLOG.md` is assigned to you.
+Delivery is incremental (V0.1 → V0.5 → V1.0 → V1.x, see `docs/RELEASE_PLAN.md`). Build for the issue's release only. Money and attribution features must stay behind their flags until the release gate passes.
 
 ## Hard rules (summary)
 - Rust only for production logic. No Node/Python backend.

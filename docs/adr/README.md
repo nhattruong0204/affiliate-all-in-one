@@ -19,3 +19,4 @@ All ADRs below are **Proposed** until the owner approves the architecture PR.
 | 0012 | Manual-review payouts first; automated disbursement disabled | Proposed |
 | 0013 | ACCESSTRADE as first provider; direct integrations behind disabled adapters | Proposed |
 | 0014 | Single-level referrals only; multi-level hard-disabled | Proposed |
+| 0015 | Incremental releases (V0.1 → V0.5 → V1.0 → V1.x) with readiness gates | Proposed |

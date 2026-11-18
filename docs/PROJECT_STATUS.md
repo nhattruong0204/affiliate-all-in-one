@@ -1,6 +1,6 @@
 # Project Status
 
-**Phase:** Architecture review. No production code. Last updated 2026-11-17.
+**Phase:** Architecture review. No production code. Last updated 2026-11-18 (re-planned into incremental releases, ADR-0015).
 
 ## 1. Executive summary
 
@@ -10,7 +10,15 @@
 
 **Technology decisions.** Rust stable, Axum, Tokio, Leptos, Tailwind standalone, PostgreSQL 17, SQLx, Reqwest+rustls, tracing/OTel, Prometheus/Loki/Grafana, utoipa, Caddy, Docker Compose, GitHub Actions, Playwright, k6. Redis is deliberately excluded from V1 (ADR-0004). → `TECH_STACK.md`.
 
-**Implementation sequence.** 51 issues across 7 milestones in 14 dependency waves. Critical path: workspace → DB foundation → ledger → ingestion → entitlements → settlement → withdrawals → payout ops → security review → live verification. → `IMPLEMENTATION_ROADMAP.md`, `ENGINEERING_BACKLOG.md`.
+**Release strategy (2026-11-18).** 52 issues across four gated releases. → `RELEASE_PLAN.md`.
+| Release | Issues | Ships | Calendar estimate (2 sessions per model / 1) |
+|---|---|---|---|
+| V0.1 Public Website Preview | 13 | landing, analyzer preview, waitlist, legal | ~4 / ~7 weeks |
+| V0.5 Private Alpha | 16 | invite accounts, real tracked links, cashback tracking (no withdrawals) | ~10 / ~16 weeks cumulative |
+| V1.0 Commercial | 15 | open sign-up, settlement-gated balances, manual-review withdrawals | ~15 / ~23 weeks cumulative |
+| V1.x Growth | 8 | referral, check-in, tickets, blog, PWA, extra providers | rolling |
+
+**Critical path.** AAO-001 → 004 → 010 → 013 → 023 → 025 → 031 → 033 → 034 → 042 → 043 → 045 → 090 → 096. The V0.1 branch is AAO-001 → 003 → 020 → 100. → `IMPLEMENTATION_ROADMAP.md`, `ENGINEERING_BACKLOG.md`.
 
 **Commercial onboarding requirements.** Legal entity; ACCESSTRADE VN publisher account; Shopee + TikTok Shop campaign approval; **written per-campaign permission for cashback/incentive traffic**; settlement cycle, clawback window and statement format; VN lawyer and tax advisor. → `AFFILIATE_PROVIDER_MATRIX.md` §6.
 
@@ -22,9 +30,11 @@
 
 **Estimated infrastructure cost.** About USD 16–60/month up to 1 000 users, 40–140 at 10 000, and 215–640 at 100 000 (indicative). Infrastructure isn't the economic constraint; acquisition cost and commission rates are. → `COST_ESTIMATION.md`.
 
-**GitHub issues.** #1–#51 (AAO-001…AAO-096), created in dependency order on GitHub with `model:*`, `effort:*`, `size:*` and milestone labels. → `ENGINEERING_BACKLOG.md` §4 for the index.
+**GitHub issues.** #1–#51 plus #53 (AAO-100). Every issue has `release:*`, `launch-blocker`, `parallelizable`, `commercial-blocker`, `model:*`, `effort:*` and `size:*` labels and a release milestone. The old M0–M6 milestones are closed and kept for history. → `ENGINEERING_BACKLOG.md` §5.
 
 **The exact first issue Claude Opus 5.5 should implement:** **AAO-003 (#3) — Domain core: Money, Bps, IDs, BusinessClock, share split.** It starts as soon as Claude Sonnet 5.5 merges **AAO-001 (#1)** (workspace skeleton + CI). AAO-003 has no I/O, unblocks AAO-020/022/023/030, and is the smallest piece where correctness matters most. Opus then takes AAO-004 and AAO-021 in the same wave.
+
+**Next five issues:** #1 AAO-001 (Sonnet) → #3 AAO-003 (Opus), #14 AAO-021 (Opus), #10 AAO-014 (Sonnet), #4 AAO-004 (Opus). All five are V0.1 launch blockers. #14 and #10 can start as soon as #1 merges.
 
 ## 2. Top 20 risks
 
@@ -98,3 +108,4 @@ L = likelihood, I = impact (H/M/L).
 | Date | Agent | Issue / branch | State | Next |
 |---|---|---|---|---|
 | 2026-11-17 | Claude Opus 5.5 (acting as Principal Architect) | `docs/architecture-v1` | Architecture package + backlog written; PR opened; GitHub issues created | Owner review of PR; decisions D-1…D-12; start OB-1…OB-6 |
+| 2026-11-18 | Claude Opus 5.5 (acting as CTO/Architect) | `docs/architecture-v1` | Re-planned into V0.1/V0.5/V1.0/V1.x (ADR-0015, RELEASE_PLAN.md); added AAO-100 (#53); relabelled and re-milestoned all 52 issues; 5 dependency edits; reasoning effort reassessed | Owner approves PR + D-4/D-6 so G-0.1 work can start; Sonnet starts #1 |

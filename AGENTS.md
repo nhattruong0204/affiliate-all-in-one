@@ -83,6 +83,12 @@ worker ──▶ app
 
 At the end of every session, update `docs/PROJECT_STATUS.md` → "Session log": issue, branch, state, what is left, known risks. The next agent starts from that entry.
 
+## 9a. Releases and feature flags
+- Every issue carries a `release:*` label. Build only what that release needs (see the issue's "MVP scope for this release"). Note deferred scope in the PR description.
+- Production flags (`signup.mode`, `cashback.links_enabled`, `withdrawals.enabled`, `auth.google_enabled`, `advance.enabled`, `payouts.automated`, `referrals.*`) default to the safe value in code **and** in the seeded config. Only the owner flips them, and only after the gate in `docs/RELEASE_PLAN.md` §4 passes.
+- Never put a money-moving path behind a UI-only check. The API and worker must enforce the flag too, with a test.
+- `commercial-blocker` issues may be built and merged, but they must not be enabled in production until the named prerequisite is recorded in `docs/PROJECT_STATUS.md`.
+
 ## 10. Forbidden
 
 Cookie stuffing, hidden/forced redirects, auto-click, iframe loading of affiliate links, rewriting other publishers' attribution, pay-to-join or recruitment-only rewards, enabling multi-level rewards, enabling automated payouts, scraping authenticated competitor areas, copying competitor code/copy/assets.
