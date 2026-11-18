@@ -2,7 +2,7 @@
 
 Vietnamese-first cashback platform: users paste a merchant product link, receive a tracked affiliate link, and earn a configurable share of the affiliate commission once the order is approved **and funded**.
 
-> **Status: architecture review.** No production code exists. Nothing in `docs/` is approved until the owner signs off on the architecture PR. See `docs/PROJECT_STATUS.md`.
+> **Status: architecture approved; implementation started.** The Cargo workspace and CI baseline exist (AAO-001); product code lands release by release (`docs/RELEASE_PLAN.md`). See `docs/PROJECT_STATUS.md`.
 
 ## Start here
 
@@ -19,6 +19,18 @@ Vietnamese-first cashback platform: users paste a merchant product link, receive
 ## Stack (proposed)
 
 Rust stable · Axum · Tokio · Leptos (SSR + hydration) · Tailwind · PostgreSQL · SQLx · Caddy · Docker Compose · GitHub Actions. Redis is deliberately **not** in V1 (ADR-0004).
+
+## Develop
+
+Prerequisites: Docker, [`just`](https://github.com/casey/just), `jq`, `perl`, `cargo-nextest`, `cargo-deny`, `cargo-audit`. The Rust toolchain is pinned in `rust-toolchain.toml` and installed by `rustup` on first use.
+
+```
+just lint      # fmt, clippy -D warnings, architecture checks, cargo deny, cargo audit
+just test      # nextest + doctests
+just db-up     # local Postgres 17 on 127.0.0.1 (random password in gitignored .env)
+```
+
+Crate map and allowed dependency directions: `docs/ARCHITECTURE.md` §4, enforced by `scripts/check-deps.sh`.
 
 ## Non-negotiables
 

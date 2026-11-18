@@ -1,0 +1,109 @@
+name: CI
+
+# Required status checks for branch protection (D-12): lint, test, supply-chain, secrets.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so new advisories are noticed even when nobody is pushing.
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+# Read-only by default; no job asks for more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "5"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  lint:
+    name: lint
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: just@1.59.0
+      - run: just fmt-check
+      - run: just clippy
+      - name: Architecture guard-rails (dependency direction, no string-built SQL, self-tests)
+        run: just arch-checks
+      - name: shellcheck
+        run: shellcheck scripts/*.sh scripts/tests/*.sh
+
+  test:
+    name: test
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: just@1.59.0,cargo-nextest@0.9.152
+      - name: nextest, doctests, sqlx offline metadata
+        run: just test
+
+  supply-chain:
+    name: supply-chain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && rustup show active-toolchain
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: just@1.59.0,cargo-deny@0.20.2,cargo-audit@0.23.0
+      - name: cargo deny (licences, bans, sources, advisories)
+        run: just deny
+      - name: cargo audit
+        run: just audit
+
+  secrets:
+    name: secrets
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      # SHA-256 of gitleaks_8.30.1_linux_x64.tar.gz, matching the release's checksums file.
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan history, not just the tip
+          persist-credentials: false
+      - name: Install gitleaks (pinned, checksum-verified)
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan history and working tree (findings are redacted in logs)
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1 .
+          "$RUNNER_TEMP/gitleaks" dir --redact --no-banner --exit-code 1 .

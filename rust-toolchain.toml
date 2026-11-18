@@ -1,0 +1,6 @@
+# Pinned so local, CI and release builds use the same compiler.
+# Bump deliberately in its own PR (and let Dependabot/CI show what breaks).
+[toolchain]
+channel = "1.97.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

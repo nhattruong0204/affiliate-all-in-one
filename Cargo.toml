@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+# docs/ARCHITECTURE.md §4: nine crates is the V1 ceiling. Adding one needs an ADR.
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+license = "LicenseRef-Proprietary" # placeholder until the owner decides D-4 (entity/licence)
+
+[workspace.dependencies]
+# Workspace-internal crates. External dependencies are added per issue, each
+# justified in its PR (AGENTS.md §6) and checked by `cargo deny`.
+domain = { path = "crates/domain" }
+db = { path = "crates/db" }
+ledger = { path = "crates/ledger" }
+affiliate = { path = "crates/affiliate" }
+app = { path = "crates/app" }
+ui = { path = "crates/ui" }
+testkit = { path = "crates/testkit" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# AGENTS.md §4: no unwrap/expect/panic outside tests and startup wiring
+# (clippy.toml allows them inside #[cfg(test)]).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+# Pedantic lints that are noise for this codebase.
+module_name_repetitions = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

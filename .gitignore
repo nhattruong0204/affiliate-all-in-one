@@ -1,0 +1,21 @@
+/target
+**/*.rs.bk
+
+# Local environment and secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Test and build output
+/playwright-report/
+/test-results/
+*.profraw
