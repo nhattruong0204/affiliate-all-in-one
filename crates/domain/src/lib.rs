@@ -2,3 +2,7 @@
 
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic)]
+
+pub fn bad_rate(amount: f64) -> f64 {
+    amount * 0.15
+}
