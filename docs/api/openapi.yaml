@@ -165,4 +165,23 @@ paths:
   /healthz:
     get: { security: [ {} ], responses: { '200': { description: Process alive } } }
   /readyz:
-    get: { security: [ {} ], responses: { '200': { description: DB reachable and migrations current }, '503': { description: Not ready } } }
+    get:
+      security: [ {} ]
+      description: >
+        Runs the readiness checks (database reachability today; migrations-current once AAO-004 lands).
+        Failing check names are listed in `errors[]` (`field` = check name, `code` = `unavailable`);
+        infrastructure details are never returned. Every response carries `X-Trace-Id`.
+      responses:
+        '200':
+          description: Every readiness check passed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  checks: { type: array, items: { type: object, required: [name, status], properties: { name: { type: string }, status: { type: string, enum: [ok] } } } }
+        '503':
+          description: Not ready (`code` = `not_ready`)
+          content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
