@@ -16,7 +16,12 @@ const out = join(here, '.lighthouse');
 mkdirSync(out, { recursive: true });
 
 const server = spawn(join(here, '..', 'target', 'release', 'web'), {
-  env: { ...process.env, WEB_BIND: `127.0.0.1:${port}`, RUST_LOG: 'warn' },
+  env: {
+    ...process.env,
+    WEB_BIND: `127.0.0.1:${port}`,
+    METRICS_BIND: `127.0.0.1:${Number(port) + 1000}`,
+    RUST_LOG: 'warn',
+  },
   stdio: 'inherit',
 });
 const stop = () => server.kill('SIGTERM');

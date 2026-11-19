@@ -17,8 +17,9 @@ domain = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true }
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }

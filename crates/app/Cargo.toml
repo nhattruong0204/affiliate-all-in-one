@@ -15,3 +15,10 @@ domain = { workspace = true }
 db = { workspace = true }
 ledger = { workspace = true }
 affiliate = { workspace = true }
+getrandom = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

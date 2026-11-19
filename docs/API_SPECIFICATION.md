@@ -11,7 +11,7 @@ Status: PROPOSED. Machine-readable draft: `docs/api/openapi.yaml` (OpenAPI 3.1).
 | `/go/{token}` | Anyone with the link | none |
 | `/hooks/{provider}` | Providers | Provider-specific verification |
 | `/healthz`, `/readyz` | Caddy, monitors | none (no data) |
-| `/metrics` | Prometheus (internal network only) | network ACL |
+| `/metrics` | Prometheus (internal network only) | network ACL. Served on a **separate listener** (`METRICS_BIND`, default `127.0.0.1:9100`), not on the public port; see `docs/OBSERVABILITY.md` |
 
 ## 2. Conventions
 - JSON, `snake_case`. Money is `{ "amount": 35000, "currency": "VND" }` (integer). Timestamps are RFC 3339 UTC.
@@ -26,7 +26,7 @@ Status: PROPOSED. Machine-readable draft: `docs/api/openapi.yaml` (OpenAPI 3.1).
   "status": 422, "code": "insufficient_balance", "detail": "Số dư khả dụng không đủ.",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "errors": [{"field": "amount", "code": "min"}] }
 ```
-`code` is stable and machine-readable. `detail` is localized per `Accept-Language` / user locale.
+`code` is stable and machine-readable. `detail` is localized per `Accept-Language` / user locale (Vietnamese when absent or unsupported). `trace_id` equals the `X-Trace-Id` response header and the `trace_id` of the server log lines for that request. `detail` is fixed text per `code`; internal error messages are never sent.
 - **Rate limits:** `429` with `Retry-After`. Default buckets: anonymous analyze 10/min/IP, link create 30/hour/user, login 5/15min/account plus 20/15min/IP, withdrawals 5/day/user.
 - **Versioning:** URI major version. Additive changes are allowed within v1. Removal or semantic change → v2, with v1 supported ≥ 6 months after v2 GA. `Deprecation` and `Sunset` headers.
 
