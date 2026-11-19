@@ -60,6 +60,30 @@ test:
     cargo test --workspace --locked --doc
     scripts/sqlx-check.sh
 
-# Playwright suite arrives with the first user-facing pages (AAO-100); nothing to run yet.
+# --- UI assets -----------------------------------------------------------------------------
+
+# Regenerate crates/ui/assets/app.css from crates/ui/style/tailwind.css (commit the result).
+css:
+    "$(scripts/install-tailwind.sh)" -i crates/ui/style/tailwind.css -o crates/ui/assets/app.css --minify
+
+# Fail if the committed app.css is stale (CI). Also runs after any change to a component's classes.
+css-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT
+    "$(scripts/install-tailwind.sh)" -i crates/ui/style/tailwind.css -o "$tmp" --minify
+    if ! cmp -s "$tmp" crates/ui/assets/app.css; then
+      echo "crates/ui/assets/app.css is stale: run 'just css' and commit the result" >&2
+      exit 1
+    fi
+
+# Playwright + axe against the real server (builds and starts `web` itself). Needs Chrome and
+# `npm ci --prefix e2e` once. SCREENSHOTS=1 also writes e2e/screenshots/.
 e2e:
-    @echo "e2e: no suite yet (added with AAO-100)"
+    cd e2e && npx playwright test
+
+# Lighthouse mobile run against a release build of the shell page (Perf >= 90, A11y >= 95).
+lighthouse:
+    cargo build --release --locked -p web
+    cd e2e && node lighthouse-check.mjs

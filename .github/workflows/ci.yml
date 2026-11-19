@@ -1,6 +1,8 @@
 name: CI
 
 # Required status checks for branch protection (D-12): lint, test, supply-chain, secrets.
+# e2e (Playwright + axe + strict CSP) and lighthouse (mobile Perf >= 90, A11y >= 95) arrive with
+# AAO-014; add them to the required list once they have been stable for a few PRs.
 on:
   pull_request:
   push:
@@ -46,6 +48,8 @@ jobs:
         run: just arch-checks
       - name: shellcheck
         run: shellcheck scripts/*.sh scripts/tests/*.sh
+      - name: Generated CSS is up to date (Tailwind standalone CLI, checksum-pinned)
+        run: just css-check
 
   test:
     name: test
@@ -64,6 +68,83 @@ jobs:
           tool: just@1.59.0,cargo-nextest@0.9.152
       - name: nextest, doctests, sqlx offline metadata
         run: just test
+
+  e2e:
+    name: e2e
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: just@1.59.0
+      - name: Build the server once so Playwright starts it instantly
+        run: cargo build --locked -p web
+      - name: Install e2e dependencies (lockfile only, no install scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: e2e
+      - name: Playwright + axe against the real server (system Chrome), with PR screenshots
+        run: just e2e
+        env:
+          CI: "true"
+          SCREENSHOTS: "1"
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-traces
+          path: e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  lighthouse:
+    name: lighthouse
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Release build (what production serves)
+        run: cargo build --release --locked -p web
+      - name: Install e2e dependencies (lockfile only, no install scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: e2e
+      - name: Lighthouse mobile, median of 3 (Performance >= 90, Accessibility >= 95)
+        run: node lighthouse-check.mjs
+        working-directory: e2e
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lighthouse-reports
+          path: e2e/.lighthouse/
+          if-no-files-found: ignore
+          retention-days: 7
 
   supply-chain:
     name: supply-chain

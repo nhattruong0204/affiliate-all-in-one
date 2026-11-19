@@ -33,7 +33,9 @@ just dev          # compose up postgres, run web + worker with watch (needs carg
 just test         # cargo nextest + doctests + sqlx offline check
 just lint         # fmt --check, clippy -D warnings, arch-checks, cargo deny, cargo audit
 just arch-checks  # dependency-direction check, no string-built SQL, and their self-tests
-just e2e          # Playwright against local stack (suite arrives with AAO-100)
+just css          # regenerate crates/ui/assets/app.css (Tailwind standalone); `just css-check` verifies it
+just e2e          # Playwright + axe + strict-CSP tests against the real server (npm ci --prefix e2e first)
+just lighthouse   # mobile Lighthouse on a release build (Perf >= 90, A11y >= 95)
 ```
 Tooling: `just`, `cargo-nextest`, `cargo-deny`, `cargo-audit`, `jq`, `perl`, Docker. CI installs pinned versions (`.github/workflows/ci.yml`).
 

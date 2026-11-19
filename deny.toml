@@ -6,7 +6,14 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []   # every exception needs an ID, a reason and an expiry date in a comment
+# Every exception needs an ID, a reason and an expiry date in a comment.
+ignore = [
+  # `paste` (proc-macro, compile time only) is archived upstream. It is pulled in by every Leptos
+  # 0.8 release (leptos, tachys, reactive_graph, either_of); there is no safe upgrade and no
+  # runtime code from it ships. Added in AAO-014 (owner decision: adopting Leptos, ADR-0003).
+  # Re-check by 2027-02-18: drop this entry once Leptos moves to `pastey` or removes it.
+  { id = "RUSTSEC-2024-0436", reason = "unmaintained compile-time macro crate required by Leptos 0.8" },
+]
 
 [licenses]
 version = 2
@@ -21,6 +28,9 @@ allow = [
   "Unicode-3.0",
   "Zlib",
   "MPL-2.0",
+  # Added in AAO-014 for the Leptos dependency tree; both are permissive:
+  "CC0-1.0",  # base16 (via leptos -> wasm_split_macros): public-domain dedication
+  "BSL-1.0",  # xxhash-rust (via leptos -> server_fn): Boost licence, MIT-like
 ]
 
 [licenses.private]

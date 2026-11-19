@@ -1,0 +1,8 @@
+# cargo-audit policy. Changes need owner review (CODEOWNERS), same as deny.toml.
+# Every exception needs an ID, a reason and an expiry date.
+[advisories]
+ignore = [
+  # `paste`: archived upstream, compile-time proc-macro only, required by every Leptos 0.8 release
+  # (see deny.toml). Added in AAO-014. Re-check by 2027-02-18.
+  "RUSTSEC-2024-0436",
+]

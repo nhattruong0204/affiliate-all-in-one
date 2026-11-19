@@ -1,0 +1,16 @@
+{
+  "name": "aao-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "End-to-end, accessibility and performance checks for the web UI (not shipped).",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "lighthouse": "node lighthouse-check.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1",
+    "lighthouse": "13.6.0"
+  }
+}

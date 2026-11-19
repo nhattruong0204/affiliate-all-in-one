@@ -1,6 +1,6 @@
 [package]
 name = "ui"
-description = "Leptos components and pages, i18n catalog, design tokens."
+description = "Leptos components and pages, i18n catalogs, design tokens and embedded static assets."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,4 +11,10 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-domain = { workspace = true }
+# SSR only for V0.1: pages render to HTML on the server; the interactive bits (theme, toasts,
+# submit guard) are ~3 KB of first-party JS. Hydration/islands are added by the first issue that
+# needs a client-side island (see docs/UI_FOUNDATIONS.md).
+leptos = { workspace = true, features = ["ssr"] }
+# Fluent catalogs (docs/UI_UX_SPECIFICATION.md §9). Concurrent bundle: shared across requests.
+fluent-bundle = { workspace = true }
+unic-langid = { workspace = true }

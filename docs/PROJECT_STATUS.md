@@ -1,6 +1,6 @@
 # Project Status
 
-**Phase:** Architecture approved (PR #52 merged 2026-11-18); V0.1 implementation started with AAO-001. Last updated 2026-11-18.
+**Phase:** Architecture approved (PR #52 merged 2026-11-18); V0.1 implementation in progress: AAO-001 merged, AAO-014 (UI shell) in review (PR #58). Last updated 2026-11-18.
 
 ## 1. Executive summary
 
@@ -102,7 +102,9 @@ L = likelihood, I = impact (H/M/L).
 | D-9 | External penetration test before public launch | Recommend yes, scoped to auth, payouts, admin |
 | D-10 | Tax treatment of cashback and rewards | After advisor (C-TAX-*) |
 | D-11 | Reconciliation tolerance and negative-balance write-off period | Recommend 0đ tolerance on ledger, 1% on provider dashboards, 180-day write-off |
-| D-12 | GitHub settings: branch protection, required checks, CODEOWNERS enforcement | Owner sets these in repository settings after AAO-001 |
+| D-13 | Supply-chain exceptions for the Leptos dependency tree (AAO-014): allow licences `CC0-1.0` and `BSL-1.0`; ignore RUSTSEC-2024-0436 (`paste`, unmaintained compile-time macro, required by every Leptos 0.8 release) in `deny.toml` and `.cargo/audit.toml`, review by 2027-02-18 | Recommend approve; the alternative is a different UI stack (ADR-0003 fallback HTMX + Askama) |
+| D-14 | V0.1 UI is server-rendered only (no WASM/hydration) until the first interactive island needs it; `cargo-leptos` is not set up yet (deviation from AAO-014's technical notes, consistent with ADR-0003 "selective hydration") | Recommend approve: best mobile performance, strict CSP, faster V0.1 |
+| D-12 | GitHub settings: branch protection, required checks, CODEOWNERS enforcement | Owner sets these in repository settings after AAO-001; also require the new `e2e` (and later `lighthouse`) jobs once stable |
 
 ## 5. Session log
 | Date | Agent | Issue / branch | State | Next |
@@ -110,3 +112,4 @@ L = likelihood, I = impact (H/M/L).
 | 2026-11-17 | Claude Opus 5.5 (acting as Principal Architect) | `docs/architecture-v1` | Architecture package + backlog written; PR opened; GitHub issues created | Owner review of PR; decisions D-1…D-12; start OB-1…OB-6 |
 | 2026-11-18 | Claude Opus 5.5 (acting as CTO/Architect) | `docs/architecture-v1` | Re-planned into V0.1/V0.5/V1.0/V1.x (ADR-0015, RELEASE_PLAN.md); added AAO-100 (#53); relabelled and re-milestoned all 52 issues; 5 dependency edits; reasoning effort reassessed | Owner approves PR + D-4/D-6 so G-0.1 work can start; Sonnet starts #1 |
 | 2026-11-18 | Claude Sonnet 5.5 | `feat/AAO-001-workspace-skeleton` (#1) | Workspace skeleton, toolchain pin, lints, guard-rail scripts + self-test, justfile, compose.dev.yml, CODEOWNERS, PR template, `deny.toml`, `ci.yml` written; local fmt/clippy/build/arch-checks/gitleaks pass. `deny`, `audit`, `nextest` could not run in the sandbox (no network/tools); CI is the first real run | Owner: review/merge, then set branch protection (D-12: require `lint`, `test`, `supply-chain`, `secrets`; code-owner review). Next: AAO-003, AAO-021, AAO-014, AAO-004 can start once merged |
+| 2026-11-18 | Claude Sonnet 5.5 | `feat/AAO-014-ui-shell` (#10, PR #58) | UI foundations: design tokens (light/dark, contrast-tested), `AppShell` with mobile bottom / desktop top nav, theme toggle without flash, vi/en Fluent catalogs, buttons, forms, cards, alerts, toasts, skeletons, empty/error states, component gallery, `web` SSR host with strict CSP, committed Tailwind CSS (`just css`), docs/UI_FOUNDATIONS.md. CI green: fmt, clippy, nextest, deny, audit, gitleaks, css-check, Playwright + axe (WCAG 2.2 A/AA, 0 violations, both themes, desktop + mobile), strict-CSP test, Lighthouse mobile 100/100. `Modal`, `MoneyText`, `StatePill` deferred (AAO-036). Brand name/logo are placeholders (D-4) | Owner: review/merge PR #58, decide D-13/D-14. Next: AAO-005 (#5, Sonnet) then AAO-002 (#2, Sonnet) in parallel; AAO-091 and AAO-100 build on 005 + 014 |

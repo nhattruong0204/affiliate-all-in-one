@@ -14,3 +14,11 @@ workspace = true
 app = { workspace = true }
 ui = { workspace = true }
 domain = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }
