@@ -1,0 +1,34 @@
+name: tmp-seeded
+# THROWAWAY (AAO-002): proves the Trivy gate blocks a seeded vulnerable dependency. Scratch branch only.
+on:
+  push:
+    branches: [scratch/aao-002-seeded-vuln]
+permissions:
+  contents: read
+jobs:
+  seeded:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Seed a known-vulnerable crate (hyper 0.14.9, CVE-2021-32714 / GHSA-5h46-h7hh-c6x9)
+        run: |
+          rustup toolchain install --no-self-update
+          cargo add --package web hyper@=0.14.9 --no-default-features
+          cargo fetch
+          git diff --stat
+      - name: Build web image with the seeded dependency
+        run: |
+          docker buildx build --load --target web \
+            --build-arg CARGO_CHEF_VERSION=0.1.78 --build-arg CARGO_AUDITABLE_VERSION=0.7.7 \
+            --tag aao-web:seeded .
+      - name: Trivy must block
+        run: |
+          trivy="$(scripts/install-trivy.sh)"
+          if "$trivy" image --no-progress --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+               --exit-code 1 --ignorefile .trivyignore.yaml aao-web:seeded; then
+            echo "FAIL: Trivy did not block the seeded vulnerable dependency"; exit 1
+          fi
+          echo "OK: Trivy blocked the seeded vulnerable dependency"
