@@ -187,7 +187,8 @@ jobs:
           trivy="$(scripts/install-trivy.sh)"
           for image in aao-web:ci aao-worker:ci; do
             "$trivy" image --no-progress --scanners vuln \
-              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+              --ignorefile .trivyignore.yaml "$image"
           done
 
   supply-chain:

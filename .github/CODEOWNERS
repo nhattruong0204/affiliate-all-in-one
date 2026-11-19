@@ -15,6 +15,7 @@
 /scripts/image-smoke.sh             @nhattruong0204
 /Dockerfile                          @nhattruong0204
 /renovate.json                       @nhattruong0204
+/.trivyignore.yaml                   @nhattruong0204
 /scripts/check-deps.sh               @nhattruong0204
 /scripts/check-no-sql-format.sh      @nhattruong0204
 /scripts/tests/                      @nhattruong0204
