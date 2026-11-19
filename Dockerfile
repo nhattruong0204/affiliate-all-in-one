@@ -2,7 +2,8 @@
 #
 # One Dockerfile, two images: `--target web` (default) and `--target worker`.
 # Build:  docker build --build-arg CARGO_CHEF_VERSION=… --build-arg CARGO_AUDITABLE_VERSION=… .
-# (tool versions have no default on purpose: CI passes the pinned values, Renovate bumps them).
+# (tool versions have no default on purpose: the `image` job in .github/workflows/ci.yml holds
+# the pinned values and Renovate bumps them there). Base images are pinned by digest.
 #
 # Notes
 # * CSS/JS/fonts are committed under crates/ui/assets and embedded at compile time, so the build
@@ -17,7 +18,7 @@
 ARG RUST_VERSION=1.97.0
 
 # ---- chef: toolchain + build tools ------------------------------------------------------------
-FROM rust:${RUST_VERSION}-bookworm AS chef
+FROM rust:${RUST_VERSION}-bookworm@sha256:8fa55b2f3ddf97471ab6a767bfa3f37e6bad0986ba823e75fea57e2a2a5c3073 AS chef
 ARG CARGO_CHEF_VERSION
 ARG CARGO_AUDITABLE_VERSION
 RUN test -n "${CARGO_CHEF_VERSION}" && test -n "${CARGO_AUDITABLE_VERSION}" \
@@ -41,7 +42,7 @@ COPY . .
 RUN cargo auditable build --release --locked -p web -p worker
 
 # ---- worker image ------------------------------------------------------------------------------
-FROM gcr.io/distroless/cc-debian12:nonroot AS worker
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f AS worker
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="aao-worker" \
       org.opencontainers.image.source="https://github.com/nhattruong0204/affiliate-all-in-one" \
@@ -51,7 +52,7 @@ USER 10001:10001
 ENTRYPOINT ["/usr/local/bin/worker"]
 
 # ---- web image (default target; keep last) -----------------------------------------------------
-FROM gcr.io/distroless/cc-debian12:nonroot AS web
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f AS web
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="aao-web" \
       org.opencontainers.image.source="https://github.com/nhattruong0204/affiliate-all-in-one" \

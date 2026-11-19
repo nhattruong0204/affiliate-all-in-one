@@ -146,6 +146,50 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Builds the web and worker images, checks the acceptance criteria (size, UID 10001, no shell,
+  # /healthz), and gates on Trivy: fixable HIGH/CRITICAL findings in OS packages or in the Rust
+  # dependency set embedded by cargo-auditable fail the build. Image signing (cosign) and SBOM
+  # publication move to the V1.0 gate (AAO-090).
+  image:
+    name: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # renovate: datasource=crate depName=cargo-chef
+      CARGO_CHEF_VERSION: "0.1.78"
+      # renovate: datasource=crate depName=cargo-auditable
+      CARGO_AUDITABLE_VERSION: "0.7.7"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Dockerfile Rust version matches rust-toolchain.toml
+        run: |
+          docker_v="$(sed -n 's/^ARG RUST_VERSION=//p' Dockerfile)"
+          toolchain_v="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "Dockerfile=${docker_v} rust-toolchain.toml=${toolchain_v}"
+          test -n "$docker_v" && test "$docker_v" = "$toolchain_v"
+      - name: Build web and worker images
+        run: |
+          epoch="$(git log -1 --pretty=%ct)"
+          for target in worker web; do
+            docker buildx build --load --target "$target" \
+              --build-arg "CARGO_CHEF_VERSION=${CARGO_CHEF_VERSION}" \
+              --build-arg "CARGO_AUDITABLE_VERSION=${CARGO_AUDITABLE_VERSION}" \
+              --build-arg "SOURCE_DATE_EPOCH=${epoch}" \
+              --build-arg "VCS_REF=${GITHUB_SHA}" \
+              --tag "aao-${target}:ci" .
+          done
+      - name: Image smoke (size, UID 10001, no shell, /healthz, /readyz)
+        run: scripts/image-smoke.sh aao-web:ci aao-worker:ci
+      - name: Trivy (fail on fixable HIGH/CRITICAL)
+        run: |
+          trivy="$(scripts/install-trivy.sh)"
+          for image in aao-web:ci aao-worker:ci; do
+            "$trivy" image --no-progress --scanners vuln \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
+          done
+
   supply-chain:
     name: supply-chain
     runs-on: ubuntu-24.04
