@@ -20,17 +20,11 @@
 
 use std::fmt;
 use std::io;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-const DEFAULT_WEB_BIND: SocketAddr = SocketAddr::new(
-    std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-    8080,
-);
-const DEFAULT_METRICS_BIND: SocketAddr = SocketAddr::new(
-    std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-    9100,
-);
+const DEFAULT_WEB_BIND: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
+const DEFAULT_METRICS_BIND: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 9100);
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 2_000;
 const READINESS_TIMEOUT_RANGE_MS: std::ops::RangeInclusive<u64> = 100..=10_000;
 const DEFAULT_PG_PORT: u16 = 5432;
@@ -169,16 +163,17 @@ impl Config {
         };
 
         let database = match secret("DATABASE_URL", env, &get, &read_file) {
-            Ok(Some(url)) => match parse_postgres_endpoint(url.expose()) {
-                Some((host, port)) => Some(DatabaseConfig { url, host, port }),
-                None => {
+            Ok(Some(url)) => {
+                if let Some((host, port)) = parse_postgres_endpoint(url.expose()) {
+                    Some(DatabaseConfig { url, host, port })
+                } else {
                     issues.push(
                         "DATABASE_URL must look like postgres://user:password@host:port/database"
                             .to_owned(),
                     );
                     None
                 }
-            },
+            }
             Ok(None) => {
                 if env == AppEnv::Production {
                     issues.push("DATABASE_URL_FILE is required in production".to_owned());

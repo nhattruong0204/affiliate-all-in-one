@@ -224,9 +224,9 @@ mod tests {
         assert_eq!(report.to_json()["checks"][1]["status"], "unavailable");
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn a_hanging_check_times_out_instead_of_hanging_the_probe() {
-        let readiness = Readiness::new(Duration::from_millis(200)).with_check(Arc::new(Hangs));
+        let readiness = Readiness::new(Duration::from_millis(50)).with_check(Arc::new(Hangs));
         let report = readiness.run().await;
         assert_eq!(
             report.checks,
