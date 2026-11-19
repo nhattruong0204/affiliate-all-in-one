@@ -198,8 +198,8 @@ mod tests {
     #[test]
     fn histogram_buckets_are_cumulative_and_sums_are_exact() {
         let metrics = Metrics::new();
-        metrics.observe_request("GET", "/", 200, Duration::from_micros(4_000)); // ≤ 5 ms
-        metrics.observe_request("GET", "/", 200, Duration::from_micros(80_000)); // ≤ 100 ms
+        metrics.observe_request("GET", "/", 200, Duration::from_millis(4)); // ≤ 5 ms
+        metrics.observe_request("GET", "/", 200, Duration::from_millis(80)); // ≤ 100 ms
         metrics.observe_request("GET", "/", 200, Duration::from_secs(30)); // beyond 10 s
         let text = metrics.render();
         let labels = r#"method="GET",route="/""#;

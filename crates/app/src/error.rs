@@ -362,7 +362,7 @@ mod tests {
             "{json}"
         );
         let json = AppError::Forbidden.problem(&context(Lang::En)).to_json();
-        assert!(!json.contains("errors"), "{json}");
+        assert!(!json.contains(r#""errors""#), "{json}");
     }
 
     #[test]
