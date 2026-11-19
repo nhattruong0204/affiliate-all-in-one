@@ -40,10 +40,10 @@ impl IntoResponse for ApiError {
             problem.to_json(),
         )
             .into_response();
-        if let Some(seconds) = error.retry_after_secs() {
-            if let Ok(value) = HeaderValue::from_str(&seconds.to_string()) {
-                response.headers_mut().insert(header::RETRY_AFTER, value);
-            }
+        if let Some(seconds) = error.retry_after_secs()
+            && let Ok(value) = HeaderValue::from_str(&seconds.to_string())
+        {
+            response.headers_mut().insert(header::RETRY_AFTER, value);
         }
         response
     }
