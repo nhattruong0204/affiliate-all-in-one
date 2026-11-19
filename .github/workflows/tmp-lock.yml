@@ -1,0 +1,23 @@
+name: tmp-lock
+# TEMPORARY (AAO-005): prints the refreshed Cargo.lock because the authoring sandbox cannot reach
+# crates.io. Removed before the PR is marked ready.
+on:
+  push:
+    branches: [feat/AAO-005-observability]
+    paths: [".github/workflows/tmp-lock.yml"]
+permissions:
+  contents: read
+jobs:
+  lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --no-self-update
+      - run: cargo fetch
+      - run: |
+          printf '%s%s\n' '---LOCK-' 'BEGIN---'
+          gzip -9 -c Cargo.lock | base64 -w 200
+          printf '%s%s\n' '---LOCK-' 'END---'

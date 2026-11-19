@@ -23,7 +23,12 @@ export default defineConfig({
     command: 'cargo run --locked --quiet -p web',
     cwd: '..',
     url: `${baseURL}/healthz`,
-    env: { WEB_BIND: `127.0.0.1:${port}`, WEB_UI_GALLERY: '1', RUST_LOG: 'warn' },
+    env: {
+      WEB_BIND: `127.0.0.1:${port}`,
+      METRICS_BIND: `127.0.0.1:${Number(port) + 1000}`,
+      WEB_UI_GALLERY: '1',
+      RUST_LOG: 'warn',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
   },

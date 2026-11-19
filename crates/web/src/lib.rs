@@ -3,4 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod health;
+pub mod middleware;
+pub mod problem;
 pub mod ssr;

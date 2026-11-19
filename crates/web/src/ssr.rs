@@ -1,15 +1,18 @@
 //! Server-side rendering of the `ui` pages: routing, locale/theme resolution, response headers
 //! and the embedded static assets.
 //!
-//! V0.1 serves only the neutral shell preview, the (opt-in) component gallery, `/healthz`,
-//! assets and a 404. Business routes arrive with their own issues and are added to [`router`].
+//! V0.1 serves only the neutral shell preview, the (opt-in) component gallery, `/healthz` and
+//! `/readyz`, assets and a 404. Business routes arrive with their own issues and are added to [`router`].
 
 // axum handlers must be `async fn` even when they never await, and extractors are taken by value.
 #![allow(clippy::unused_async, clippy::needless_pass_by_value)]
 
 use std::sync::Arc;
-use std::time::Instant;
 
+use crate::health;
+use crate::middleware::observe::observe;
+use app::health::Readiness;
+use app::metrics::Metrics;
 use axum::Router;
 use axum::extract::{Path, RawQuery, Request, State};
 use axum::http::header::{self, HeaderName};
@@ -67,19 +70,23 @@ impl SsrConfig {
     }
 }
 
-/// The router for every page and asset this crate serves.
-pub fn router(config: SsrConfig) -> Router {
-    Router::new()
+/// The router for every page and asset this crate serves, plus `/healthz` and `/readyz`.
+///
+/// `metrics` receives the RED measurements of every request; `readiness` backs `/readyz`.
+pub fn router(config: SsrConfig, readiness: Arc<Readiness>, metrics: Arc<Metrics>) -> Router {
+    let pages = Router::new()
         .route("/", get(home))
         .route("/en", get(home))
         .route("/_ui", get(gallery))
         .route("/en/_ui", get(gallery))
-        .route("/healthz", get(healthz))
         .route("/assets/{*path}", get(asset))
         .fallback(not_found)
+        .with_state(Arc::new(config));
+    // `observe` is outermost so it times everything, including the security-header layer.
+    pages
+        .merge(health::routes(readiness))
         .layer(middleware::from_fn(security_headers))
-        .layer(middleware::from_fn(log_requests))
-        .with_state(Arc::new(config))
+        .layer(middleware::from_fn_with_state(metrics, observe))
 }
 
 type Config = State<Arc<SsrConfig>>;
@@ -146,17 +153,6 @@ async fn not_found(State(config): Config, headers: HeaderMap, uri: Uri) -> Respo
     )
 }
 
-async fn healthz() -> Response {
-    (
-        [
-            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
-            (header::CACHE_CONTROL, "no-store"),
-        ],
-        "ok",
-    )
-        .into_response()
-}
-
 /// `?v=<hash>` as emitted by `ui::assets::Asset::url`.
 fn version_param(query: &str) -> Option<&str> {
     query.split('&').find_map(|pair| pair.strip_prefix("v="))
@@ -216,23 +212,6 @@ async fn security_headers(req: Request, next: Next) -> Response {
     response
 }
 
-/// One line per request: method, path (never the query string, which may carry tokens), status
-/// and latency. `/healthz` is logged at debug to keep probes out of the normal log.
-async fn log_requests(req: Request, next: Next) -> Response {
-    let method = req.method().clone();
-    let path = req.uri().path().to_owned();
-    let started = Instant::now();
-    let response = next.run(req).await;
-    let status = response.status().as_u16();
-    let elapsed_ms = started.elapsed().as_millis();
-    if path == "/healthz" {
-        tracing::debug!(%method, %path, status, elapsed_ms, "request");
-    } else {
-        tracing::info!(%method, %path, status, elapsed_ms, "request");
-    }
-    response
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -241,6 +220,14 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    fn test_router(config: SsrConfig) -> Router {
+        router(
+            config,
+            Arc::new(Readiness::new(std::time::Duration::from_secs(1))),
+            Arc::new(Metrics::new()),
+        )
+    }
 
     async fn fetch(
         config: SsrConfig,
@@ -251,7 +238,7 @@ mod tests {
         if let Some(cookie) = cookie {
             request = request.header(header::COOKIE, cookie);
         }
-        let response = router(config)
+        let response = test_router(config)
             .oneshot(request.body(Body::empty()).expect("valid request"))
             .await
             .expect("infallible");
