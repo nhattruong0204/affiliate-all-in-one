@@ -1,6 +1,10 @@
 //! End-to-end behaviour of the operational surface: readiness against a real (local) TCP
 //! dependency, problem+json on failure, trace-id propagation, metrics and log hygiene.
 
+// Helpers in an integration-test crate are not `#[test]` functions, so clippy.toml's
+// allow-*-in-tests does not cover them; panicking on a broken fixture is the point here.
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
