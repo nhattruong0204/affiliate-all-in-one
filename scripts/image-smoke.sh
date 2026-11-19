@@ -52,7 +52,10 @@ done
   || fail "/metrics must not be served on the public port"
 [[ "$(docker inspect --format '{{.State.Running}}' "$name")" == "true" ]] || fail "container exited"
 
-uid="$(docker top "$name" -o uid | tail -n +2 | head -n1 | tr -d '[:space:]')"
+# The PID-1 process must really run as 10001: read it from the kernel (no shell in the image, so
+# inspect from the host via /proc).
+pid="$(docker inspect --format '{{.State.Pid}}' "$name")"
+uid="$(awk '/^Uid:/ {print $2}' "/proc/${pid}/status")"
 [[ "$uid" == "10001" ]] || fail "process runs as uid '${uid}', expected 10001"
 
 if [[ -n "$worker_image" ]]; then
