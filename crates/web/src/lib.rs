@@ -2,6 +2,8 @@
 //! binding a socket. The binary (`main.rs`) only wires configuration, logging and shutdown.
 
 #![forbid(unsafe_code)]
+// Constructors and pure helpers are used for their value; the lint is noise here (as in `app`).
+#![allow(clippy::must_use_candidate)]
 
 pub mod health;
 pub mod middleware;

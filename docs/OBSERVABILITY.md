@@ -20,6 +20,10 @@ together) and fail-fast. Secret values are never echoed in errors or `Debug` out
 | `LOG_FORMAT` | `json` in production, `text` otherwise | `json` \| `text` |
 | `WEB_BIND` | `127.0.0.1:8080` | public listener |
 | `METRICS_BIND` | `127.0.0.1:9100` | internal listener, `/metrics` only; must differ from `WEB_BIND` |
+| `RATE_LIMIT_PAGES_PER_MINUTE` | `120` | per-client-IP page budget (1–10 000); `429` + `Retry-After` when exceeded; assets and probes exempt |
+| `RATE_LIMIT_FORMS_PER_MINUTE` | `10` | budget for anonymous form endpoints (applied from AAO-100) |
+| `TRUST_FORWARDED_FOR` | `false` | use the right-most `X-Forwarded-For` entry as the client IP; set `true` only behind our own proxy |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY[_FILE]` | unset | both or neither; enables the CAPTCHA CSP origins (verification adapter lands with AAO-100) |
 | `READINESS_TIMEOUT_MS` | `2000` | budget per readiness check, 100–10000 |
 | `DATABASE_URL` / `DATABASE_URL_FILE` | unset | `postgres://…`; set one, not both |
 | `WEB_UI_GALLERY`, `WEB_PUBLIC_BASE_URL` | off / unset | page-rendering switches (`web::ssr::SsrConfig`); the gallery is refused when `APP_ENV=production` |

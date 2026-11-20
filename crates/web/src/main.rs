@@ -11,6 +11,7 @@
 
 #![forbid(unsafe_code)]
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -22,6 +23,7 @@ use axum::Router;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use web::health::metrics_router;
+use web::middleware::Hardening;
 use web::ssr::{self, SsrConfig};
 
 #[tokio::main]
@@ -52,8 +54,22 @@ async fn main() -> anyhow::Result<()> {
         env = ?config.env,
         ui_gallery = ssr_config.ui_gallery,
         database_configured = config.database.is_some(),
+        turnstile_enabled = config.turnstile.is_some(),
+        trust_forwarded_for = config.trust_forwarded_for,
         "web listening"
     );
+    if config.env == AppEnv::Production {
+        if config.turnstile.is_none() {
+            tracing::warn!(
+                "CAPTCHA is not configured: anonymous endpoints are protected by rate limits only"
+            );
+        }
+        if !config.trust_forwarded_for {
+            tracing::warn!(
+                "TRUST_FORWARDED_FOR is off: behind a reverse proxy every client shares the proxy's rate-limit bucket"
+            );
+        }
+    }
 
     let (stop_tx, stop_rx) = watch::channel(false);
     tokio::spawn(async move {
@@ -64,7 +80,12 @@ async fn main() -> anyhow::Result<()> {
     tokio::try_join!(
         serve(
             public,
-            ssr::router(ssr_config, readiness, metrics.clone()),
+            ssr::router(
+                ssr_config,
+                readiness,
+                metrics.clone(),
+                Hardening::from_config(&config)
+            ),
             stop_rx.clone()
         ),
         serve(internal, metrics_router(metrics), stop_rx),
@@ -80,11 +101,15 @@ async fn serve(
     router: Router,
     mut stop: watch::Receiver<bool>,
 ) -> std::io::Result<()> {
-    axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            let _ = stop.wait_for(|stopped| *stopped).await;
-        })
-        .await
+    // Connect info gives the rate limiter the TCP peer address.
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        let _ = stop.wait_for(|stopped| *stopped).await;
+    })
+    .await
 }
 
 /// Resolves on Ctrl-C or SIGTERM (what orchestrators send).

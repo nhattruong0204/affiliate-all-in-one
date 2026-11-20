@@ -13,6 +13,10 @@
 //! | `METRICS_BIND` | `127.0.0.1:9100` | internal listener; must differ from `WEB_BIND` |
 //! | `READINESS_TIMEOUT_MS` | `2000` | per-check budget, 100–10000 |
 //! | `DATABASE_URL` / `DATABASE_URL_FILE` | unset | `postgres://…`; the file form reads `/run/secrets/*` |
+//! | `RATE_LIMIT_PAGES_PER_MINUTE` | `120` | per client IP, page requests (1–10000) |
+//! | `RATE_LIMIT_FORMS_PER_MINUTE` | `10` | per client IP, anonymous form/analyze endpoints (AAO-100) |
+//! | `TRUST_FORWARDED_FOR` | `false` | take the client IP from the reverse proxy's `X-Forwarded-For` |
+//! | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY[_FILE]` | unset | both or neither; enables Turnstile |
 //!
 //! In production the database is required and secrets must come from a `*_FILE` path, never from
 //! an inline environment variable (environment values leak through `/proc`, crash reports and
@@ -28,6 +32,11 @@ const DEFAULT_METRICS_BIND: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LO
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 2_000;
 const READINESS_TIMEOUT_RANGE_MS: std::ops::RangeInclusive<u64> = 100..=10_000;
 const DEFAULT_PG_PORT: u16 = 5432;
+const DEFAULT_PAGES_PER_MINUTE: u32 = 120;
+/// API_SPECIFICATION §2: anonymous analyze is 10/min/IP.
+const DEFAULT_FORMS_PER_MINUTE: u32 = 10;
+const RATE_LIMIT_RANGE: std::ops::RangeInclusive<u32> = 1..=10_000;
+const MAX_SITE_KEY_LEN: usize = 64;
 
 /// Deployment profile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +84,24 @@ pub struct DatabaseConfig {
     pub port: u16,
 }
 
+/// Per-client-IP request budgets for public (unauthenticated) endpoints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RateLimits {
+    /// Page requests (assets and probes are exempt).
+    pub pages_per_minute: u32,
+    /// Anonymous form-style endpoints (analyze, waitlist). Consumed by AAO-100.
+    pub forms_per_minute: u32,
+}
+
+/// Cloudflare Turnstile settings. Present only when explicitly configured.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TurnstileConfig {
+    /// Public key rendered into pages.
+    pub site_key: String,
+    /// Server-side verification key; never logged.
+    pub secret: Secret,
+}
+
 /// Everything the binaries need before they start serving.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -85,6 +112,12 @@ pub struct Config {
     pub metrics_bind: SocketAddr,
     pub readiness_timeout: Duration,
     pub database: Option<DatabaseConfig>,
+    pub rate_limits: RateLimits,
+    /// The service sits behind exactly one trusted reverse proxy (Caddy) that appends the real
+    /// client address to `X-Forwarded-For`. Leave `false` when reachable directly: the header is
+    /// client-controlled there.
+    pub trust_forwarded_for: bool,
+    pub turnstile: Option<TurnstileConfig>,
 }
 
 /// All validation problems found, none of which contains a secret value.
@@ -186,6 +219,60 @@ impl Config {
             }
         };
 
+        let rate_limits = RateLimits {
+            pages_per_minute: parse_u32(
+                &get,
+                "RATE_LIMIT_PAGES_PER_MINUTE",
+                DEFAULT_PAGES_PER_MINUTE,
+                &mut issues,
+            ),
+            forms_per_minute: parse_u32(
+                &get,
+                "RATE_LIMIT_FORMS_PER_MINUTE",
+                DEFAULT_FORMS_PER_MINUTE,
+                &mut issues,
+            ),
+        };
+
+        let trust_forwarded_for = match get("TRUST_FORWARDED_FOR").as_deref() {
+            None | Some("false" | "0") => false,
+            Some("true" | "1") => true,
+            Some(other) => {
+                issues.push(format!(
+                    "TRUST_FORWARDED_FOR must be 'true' or 'false', got '{other}'"
+                ));
+                false
+            }
+        };
+
+        let turnstile = match (
+            get("TURNSTILE_SITE_KEY"),
+            secret("TURNSTILE_SECRET_KEY", env, &get, &read_file),
+        ) {
+            (None, Ok(None)) => None,
+            (Some(site_key), Ok(Some(secret))) => {
+                if valid_site_key(&site_key) {
+                    Some(TurnstileConfig { site_key, secret })
+                } else {
+                    issues.push(format!(
+                        "TURNSTILE_SITE_KEY must be 1-{MAX_SITE_KEY_LEN} characters of A-Z a-z 0-9 _ -"
+                    ));
+                    None
+                }
+            }
+            (Some(_), Ok(None)) | (None, Ok(Some(_))) => {
+                issues.push(
+                    "set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY[_FILE], or neither"
+                        .to_owned(),
+                );
+                None
+            }
+            (_, Err(issue)) => {
+                issues.push(issue);
+                None
+            }
+        };
+
         if !issues.is_empty() {
             return Err(ConfigError(issues));
         }
@@ -197,8 +284,41 @@ impl Config {
             metrics_bind,
             readiness_timeout: Duration::from_millis(readiness_timeout_ms),
             database,
+            rate_limits,
+            trust_forwarded_for,
+            turnstile,
         })
     }
+}
+
+fn parse_u32(
+    get: &impl Fn(&str) -> Option<String>,
+    name: &str,
+    default: u32,
+    issues: &mut Vec<String>,
+) -> u32 {
+    match get(name) {
+        None => default,
+        Some(raw) => match raw.parse::<u32>() {
+            Ok(value) if RATE_LIMIT_RANGE.contains(&value) => value,
+            _ => {
+                issues.push(format!(
+                    "{name} must be an integer between {} and {}",
+                    RATE_LIMIT_RANGE.start(),
+                    RATE_LIMIT_RANGE.end()
+                ));
+                default
+            }
+        },
+    }
+}
+
+/// The site key is rendered into HTML, so accept only a conservative alphabet.
+fn valid_site_key(key: &str) -> bool {
+    (1..=MAX_SITE_KEY_LEN).contains(&key.len())
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 fn read_secret_file(path: &str) -> io::Result<String> {
@@ -467,6 +587,98 @@ mod tests {
                 "{url}"
             );
         }
+    }
+
+    #[test]
+    fn rate_limits_have_documented_defaults_and_validated_overrides() {
+        let config = load(&[], &[]).expect("valid");
+        assert_eq!(config.rate_limits.pages_per_minute, 120);
+        assert_eq!(config.rate_limits.forms_per_minute, 10);
+        assert!(!config.trust_forwarded_for);
+
+        let config = load(
+            &[
+                ("RATE_LIMIT_PAGES_PER_MINUTE", "300"),
+                ("RATE_LIMIT_FORMS_PER_MINUTE", "5"),
+                ("TRUST_FORWARDED_FOR", "true"),
+            ],
+            &[],
+        )
+        .expect("valid");
+        assert_eq!(config.rate_limits.pages_per_minute, 300);
+        assert_eq!(config.rate_limits.forms_per_minute, 5);
+        assert!(config.trust_forwarded_for);
+
+        for bad in ["0", "10001", "-1", "ten", "1.5"] {
+            let problems = issues(&[("RATE_LIMIT_PAGES_PER_MINUTE", bad)], &[]);
+            assert!(
+                problems[0].contains("RATE_LIMIT_PAGES_PER_MINUTE"),
+                "{bad}: {problems:?}"
+            );
+        }
+        let problems = issues(&[("TRUST_FORWARDED_FOR", "yes")], &[]);
+        assert!(problems[0].contains("TRUST_FORWARDED_FOR"), "{problems:?}");
+    }
+
+    #[test]
+    fn turnstile_needs_both_keys_and_reads_the_secret_from_a_file() {
+        assert_eq!(load(&[], &[]).expect("valid").turnstile, None);
+
+        let config = load(
+            &[
+                ("TURNSTILE_SITE_KEY", "0x4AAAA-site_key"),
+                ("TURNSTILE_SECRET_KEY_FILE", "/run/secrets/turnstile"),
+            ],
+            &[("/run/secrets/turnstile", "0x4AAAA-secret\n")],
+        )
+        .expect("valid");
+        let turnstile = config.turnstile.expect("enabled");
+        assert_eq!(turnstile.site_key, "0x4AAAA-site_key");
+        assert_eq!(turnstile.secret.expose(), "0x4AAAA-secret");
+        assert!(!format!("{config:?}").contains("0x4AAAA-secret"));
+
+        for vars in [
+            vec![("TURNSTILE_SITE_KEY", "abc")],
+            vec![("TURNSTILE_SECRET_KEY", "s")],
+        ] {
+            let problems = issues(&vars, &[]);
+            assert!(
+                problems[0].contains("both TURNSTILE_SITE_KEY"),
+                "{problems:?}"
+            );
+        }
+        for bad_key in ["has space", "<script>", "a\"b"] {
+            let problems = issues(
+                &[
+                    ("TURNSTILE_SITE_KEY", bad_key),
+                    ("TURNSTILE_SECRET_KEY", "s"),
+                ],
+                &[],
+            );
+            assert!(
+                problems[0].contains("TURNSTILE_SITE_KEY must be"),
+                "{bad_key}: {problems:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn production_rejects_an_inline_turnstile_secret() {
+        let problems = issues(
+            &[
+                ("APP_ENV", "production"),
+                ("DATABASE_URL_FILE", "/run/secrets/db"),
+                ("TURNSTILE_SITE_KEY", "abc"),
+                ("TURNSTILE_SECRET_KEY", "inline-secret"),
+            ],
+            &[("/run/secrets/db", "postgres://u:p@h/d")],
+        );
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("TURNSTILE_SECRET_KEY_FILE"),
+            "{problems:?}"
+        );
+        assert!(!problems[0].contains("inline-secret"));
     }
 
     #[test]

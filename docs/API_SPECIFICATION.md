@@ -27,7 +27,7 @@ Status: PROPOSED. Machine-readable draft: `docs/api/openapi.yaml` (OpenAPI 3.1).
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "errors": [{"field": "amount", "code": "min"}] }
 ```
 `code` is stable and machine-readable. `detail` is localized per `Accept-Language` / user locale (Vietnamese when absent or unsupported). `trace_id` equals the `X-Trace-Id` response header and the `trace_id` of the server log lines for that request. `detail` is fixed text per `code`; internal error messages are never sent.
-- **Rate limits:** `429` with `Retry-After`. Default buckets: anonymous analyze 10/min/IP, link create 30/hour/user, login 5/15min/account plus 20/15min/IP, withdrawals 5/day/user.
+- **Rate limits:** `429` problem+json (`rate_limited`) with `Retry-After` (whole seconds, rounded up). Per client IP (IPv6 by /64), token bucket. V0.1 enforces **page requests 120/min** (`RATE_LIMIT_PAGES_PER_MINUTE`; assets and probes exempt) in-process in `web`; the configured form budget (`RATE_LIMIT_FORMS_PER_MINUTE`, default 10) is applied by the analyze/waitlist handlers (AAO-100). The in-process limiter resets on restart and is per instance; DB-backed buckets (`rate_limit_buckets`) replace it with AAO-004 before login/withdrawal limits. Default buckets: anonymous analyze 10/min/IP, link create 30/hour/user, login 5/15min/account plus 20/15min/IP, withdrawals 5/day/user.
 - **Versioning:** URI major version. Additive changes are allowed within v1. Removal or semantic change → v2, with v1 supported ≥ 6 months after v2 GA. `Deprecation` and `Sunset` headers.
 
 ## 3. Endpoint catalogue (V1)
