@@ -1,0 +1,16 @@
+# Keep the build context small and free of anything that must not enter an image layer.
+.git
+.github
+.tools
+target
+e2e
+docs
+scripts
+*.md
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+compose*.yml
+justfile

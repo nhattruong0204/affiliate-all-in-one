@@ -1,0 +1,79 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
+  ],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 5,
+  "customManagers": [
+    {
+      "description": "Versions annotated with a preceding '# renovate: datasource=\u2026 depName=\u2026' comment (Dockerfile ARG, rust-toolchain.toml, CI env)",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/",
+        "/(^|/)rust-toolchain\\.toml$/",
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\s+(?:ARG [A-Z_]+=|channel = \"|[A-Z_]+: \")(?<currentValue>[0-9][0-9.]*)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "One weekly PR for Rust crates; majors stay separate so they get a real review",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "lockFileMaintenance"
+      ],
+      "groupName": "rust dependencies"
+    },
+    {
+      "description": "GitHub Actions: digests and versions together",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Docker base images and image build tools",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "groupName": "docker base images"
+    },
+    {
+      "description": "Rust toolchain: Dockerfile ARG and rust-toolchain.toml must move together",
+      "matchDepNames": [
+        "rust-lang/rust"
+      ],
+      "groupName": "rust toolchain"
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ],
+    "schedule": [
+      "at any time"
+    ]
+  }
+}

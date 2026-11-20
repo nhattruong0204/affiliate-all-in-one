@@ -1,0 +1,11 @@
+# Time-boxed Trivy exceptions for the image gate (AAO-002). Every entry needs a statement and an
+# expiry; Trivy stops honouring an entry after `expired_at`, so the gate fails again by itself.
+# Owner-reviewed path (CODEOWNERS). Do not add an entry without an owner-approved decision.
+vulnerabilities:
+  - id: CVE-2026-84782
+    statement: >
+      libssl3 ships inside gcr.io/distroless/cc-debian12:nonroot; the latest published image
+      (checked 2026-11-19) still contains the vulnerable 3.0.20-1~deb12u2 although Debian has
+      3.0.22-1~deb12u2. Our binaries do not link OpenSSL (rustls is the TLS stack) and nothing in
+      the image speaks DTLS, so the flaw is not reachable. Remove when distroless republishes.
+    expired_at: 2026-12-03
