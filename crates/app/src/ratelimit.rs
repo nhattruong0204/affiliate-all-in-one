@@ -1,7 +1,7 @@
 //! In-process token-bucket rate limiting for public endpoints.
 //!
 //! Why in-process: V0.1 runs as a single web instance, so one process sees all traffic; a
-//! PostgreSQL-backed bucket (`rate_limit_buckets`, DATABASE_DESIGN §4) adds a round trip per
+//! PostgreSQL-backed bucket (`rate_limit_buckets`, `DATABASE_DESIGN` §4) adds a round trip per
 //! request and arrives with the first stateful consumer. Consequences, accepted for V0.1:
 //! counters reset when the process restarts and are not shared between instances (revisit before
 //! scaling out or before login/withdrawal limits, which must survive restarts: V0.5).
@@ -39,7 +39,7 @@ impl Quota {
     }
 
     pub fn per_minute(requests: u32) -> Self {
-        Self::new(requests, Duration::from_secs(60))
+        Self::new(requests, Duration::from_mins(1))
     }
 
     fn capacity(self) -> u64 {

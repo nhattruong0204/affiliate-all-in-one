@@ -33,7 +33,7 @@ const DEFAULT_READINESS_TIMEOUT_MS: u64 = 2_000;
 const READINESS_TIMEOUT_RANGE_MS: std::ops::RangeInclusive<u64> = 100..=10_000;
 const DEFAULT_PG_PORT: u16 = 5432;
 const DEFAULT_PAGES_PER_MINUTE: u32 = 120;
-/// API_SPECIFICATION §2: anonymous analyze is 10/min/IP.
+/// `API_SPECIFICATION` §2: anonymous analyze is 10/min/IP.
 const DEFAULT_FORMS_PER_MINUTE: u32 = 10;
 const RATE_LIMIT_RANGE: std::ops::RangeInclusive<u32> = 1..=10_000;
 const MAX_SITE_KEY_LEN: usize = 64;
@@ -219,59 +219,9 @@ impl Config {
             }
         };
 
-        let rate_limits = RateLimits {
-            pages_per_minute: parse_u32(
-                &get,
-                "RATE_LIMIT_PAGES_PER_MINUTE",
-                DEFAULT_PAGES_PER_MINUTE,
-                &mut issues,
-            ),
-            forms_per_minute: parse_u32(
-                &get,
-                "RATE_LIMIT_FORMS_PER_MINUTE",
-                DEFAULT_FORMS_PER_MINUTE,
-                &mut issues,
-            ),
-        };
-
-        let trust_forwarded_for = match get("TRUST_FORWARDED_FOR").as_deref() {
-            None | Some("false" | "0") => false,
-            Some("true" | "1") => true,
-            Some(other) => {
-                issues.push(format!(
-                    "TRUST_FORWARDED_FOR must be 'true' or 'false', got '{other}'"
-                ));
-                false
-            }
-        };
-
-        let turnstile = match (
-            get("TURNSTILE_SITE_KEY"),
-            secret("TURNSTILE_SECRET_KEY", env, &get, &read_file),
-        ) {
-            (None, Ok(None)) => None,
-            (Some(site_key), Ok(Some(secret))) => {
-                if valid_site_key(&site_key) {
-                    Some(TurnstileConfig { site_key, secret })
-                } else {
-                    issues.push(format!(
-                        "TURNSTILE_SITE_KEY must be 1-{MAX_SITE_KEY_LEN} characters of A-Z a-z 0-9 _ -"
-                    ));
-                    None
-                }
-            }
-            (Some(_), Ok(None)) | (None, Ok(Some(_))) => {
-                issues.push(
-                    "set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY[_FILE], or neither"
-                        .to_owned(),
-                );
-                None
-            }
-            (_, Err(issue)) => {
-                issues.push(issue);
-                None
-            }
-        };
+        let rate_limits = rate_limits(&get, &mut issues);
+        let trust_forwarded_for = trust_forwarded_for(&get, &mut issues);
+        let turnstile = turnstile(env, &get, &read_file, &mut issues);
 
         if !issues.is_empty() {
             return Err(ConfigError(issues));
@@ -288,6 +238,72 @@ impl Config {
             trust_forwarded_for,
             turnstile,
         })
+    }
+}
+
+fn rate_limits(get: &impl Fn(&str) -> Option<String>, issues: &mut Vec<String>) -> RateLimits {
+    RateLimits {
+        pages_per_minute: parse_u32(
+            get,
+            "RATE_LIMIT_PAGES_PER_MINUTE",
+            DEFAULT_PAGES_PER_MINUTE,
+            issues,
+        ),
+        forms_per_minute: parse_u32(
+            get,
+            "RATE_LIMIT_FORMS_PER_MINUTE",
+            DEFAULT_FORMS_PER_MINUTE,
+            issues,
+        ),
+    }
+}
+
+fn trust_forwarded_for(get: &impl Fn(&str) -> Option<String>, issues: &mut Vec<String>) -> bool {
+    match get("TRUST_FORWARDED_FOR").as_deref() {
+        None | Some("false" | "0") => false,
+        Some("true" | "1") => true,
+        Some(other) => {
+            issues.push(format!(
+                "TRUST_FORWARDED_FOR must be 'true' or 'false', got '{other}'"
+            ));
+            false
+        }
+    }
+}
+
+/// Turnstile is all-or-nothing: a site key without a secret (or the reverse) is a misconfiguration.
+fn turnstile(
+    env: AppEnv,
+    get: &impl Fn(&str) -> Option<String>,
+    read_file: &impl Fn(&str) -> io::Result<String>,
+    issues: &mut Vec<String>,
+) -> Option<TurnstileConfig> {
+    match (
+        get("TURNSTILE_SITE_KEY"),
+        secret("TURNSTILE_SECRET_KEY", env, get, read_file),
+    ) {
+        (None, Ok(None)) => None,
+        (Some(site_key), Ok(Some(secret))) => {
+            if valid_site_key(&site_key) {
+                Some(TurnstileConfig { site_key, secret })
+            } else {
+                issues.push(format!(
+                    "TURNSTILE_SITE_KEY must be 1-{MAX_SITE_KEY_LEN} characters of A-Z a-z 0-9 _ -"
+                ));
+                None
+            }
+        }
+        (Some(_), Ok(None)) | (None, Ok(Some(_))) => {
+            issues.push(
+                "set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY[_FILE], or neither"
+                    .to_owned(),
+            );
+            None
+        }
+        (_, Err(issue)) => {
+            issues.push(issue);
+            None
+        }
     }
 }
 
@@ -632,7 +648,7 @@ mod tests {
             &[("/run/secrets/turnstile", "0x4AAAA-secret\n")],
         )
         .expect("valid");
-        let turnstile = config.turnstile.expect("enabled");
+        let turnstile = config.turnstile.clone().expect("enabled");
         assert_eq!(turnstile.site_key, "0x4AAAA-site_key");
         assert_eq!(turnstile.secret.expose(), "0x4AAAA-secret");
         assert!(!format!("{config:?}").contains("0x4AAAA-secret"));
