@@ -44,6 +44,12 @@ flowchart TB
 
 Compose principles: `read_only: true` rootfs plus `tmpfs` for `/tmp`; `cap_drop: [ALL]`; `security_opt: no-new-privileges`; memory/CPU limits; healthchecks; secrets via `secrets:` files (`/run/secrets/*`), not env; only Caddy publishes ports (80/443); SSH key-only, non-default user, `ufw` deny-all except 22/80/443, `unattended-upgrades`, `fail2ban`.
 
+### 2.1 Proxy contract for the `web` service (AAO-091; Caddy config lands in AAO-092)
+- The proxy terminates TLS and forwards to `web` on the private network. It must **append** the client address to `X-Forwarded-For` (Caddy's default) and the deployment must set `TRUST_FORWARDED_FOR=true`; `web` uses the right-most entry, so a client-supplied header cannot choose its own rate-limit bucket. Never expose `web` directly while the flag is on.
+- The proxy must **not** add security headers or HSTS of its own: `web` sends the full set (including `Strict-Transport-Security` in production), so a second copy would be a conflicting duplicate.
+- `/metrics` is on the internal listener and is never proxied.
+- The in-process limiter does not replace connection/body limits at the proxy (request size, header timeouts, per-IP connection caps), which AAO-092 configures; it also fails open if flooded with distinct addresses (see `app::ratelimit`).
+
 ## 3. Build
 - `Dockerfile` (AAO-002): one file, two images: `--target web` (default) and `--target worker`. Stages: `chef` (pinned Rust toolchain + `cargo-chef` + `cargo-auditable`), `planner` (`cargo chef prepare`), `builder` (cached `cargo chef cook`, then `cargo auditable build --release --locked -p web -p worker`), then `gcr.io/distroless/cc-debian12:nonroot` with the binary only. Runs as **UID 10001**, no shell, no package manager. Measured: web 26 MiB, worker 22 MiB (limit 60 MiB).
 - **Deviation from the original plan.** No `cargo leptos build`, no Tailwind CLI and no `site/` directory in the image: V0.1 is server-rendered only (D-14) and the CSS/JS/fonts are committed under `crates/ui/assets` and embedded into the binary at compile time; `just css-check` (CI `lint`) guarantees the committed CSS is current. Revisit when hydration arrives.

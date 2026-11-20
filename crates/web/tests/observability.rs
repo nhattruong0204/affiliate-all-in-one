@@ -19,6 +19,7 @@ use tokio::net::TcpListener;
 use tower::ServiceExt;
 use tracing_subscriber::layer::SubscriberExt;
 use web::health::metrics_router;
+use web::middleware::Hardening;
 use web::ssr::{SsrConfig, router};
 
 struct Harness {
@@ -30,7 +31,12 @@ impl Harness {
     fn new(readiness: Readiness) -> Self {
         let metrics = Arc::new(Metrics::new());
         Self {
-            public: router(SsrConfig::default(), Arc::new(readiness), metrics.clone()),
+            public: router(
+                SsrConfig::default(),
+                Arc::new(readiness),
+                metrics.clone(),
+                Hardening::default(),
+            ),
             metrics,
         }
     }
