@@ -6,7 +6,9 @@
 //! editing this file, extending its tests and the Playwright CSP check, and a security review.
 //!
 //! Deliberately absent: `Cross-Origin-Embedder-Policy` (`require-corp` would block the Turnstile
-//! iframe and nothing here needs cross-origin isolation) and cookies (none are set server-side).
+//! iframe and nothing here needs cross-origin isolation) and `Cross-Origin-Opener-Policy`
+//! (`same-origin` made Lighthouse fail with `NO_NAVSTART` in CI, breaking the `lighthouse` gate; the
+//! site opens no popups and is not framed, so it adds little; revisit with the first auth popup).
 
 use std::sync::Arc;
 
@@ -73,7 +75,6 @@ impl SecurityHeaders {
                 "permissions-policy",
                 "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
             ),
-            fixed("cross-origin-opener-policy", "same-origin"),
             fixed("cross-origin-resource-policy", "same-origin"),
             fixed("x-permitted-cross-domain-policies", "none"),
         ];
@@ -223,7 +224,6 @@ mod tests {
                     "referrer-policy",
                     "x-frame-options",
                     "permissions-policy",
-                    "cross-origin-opener-policy",
                     "cross-origin-resource-policy",
                 ] {
                     assert!(names.contains(&required), "{required} missing: {names:?}");

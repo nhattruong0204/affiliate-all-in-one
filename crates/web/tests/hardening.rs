@@ -85,11 +85,6 @@ async fn development_sends_the_baseline_headers_everywhere_but_no_hsts() {
             "{uri}"
         );
         assert_eq!(
-            header(&h, "cross-origin-opener-policy"),
-            "same-origin",
-            "{uri}"
-        );
-        assert_eq!(
             header(&h, "cross-origin-resource-policy"),
             "same-origin",
             "{uri}"
