@@ -27,6 +27,9 @@ networks:
   app: { internal: true }
   # prometheus/grafana <-> web:9100. No route to or from the internet.
   obs: { internal: true }
+  # grafana only: Docker cannot publish a port for a container that sits solely on internal
+  # networks, and grafana's loopback-only admin port (SSH tunnel) needs one.
+  admin: {}
 
 volumes:
   pgdata: {}
@@ -200,7 +203,7 @@ services:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
     tmpfs: [/tmp]
-    networks: [obs]
+    networks: [obs, admin]
     depends_on:
       prometheus: { condition: service_healthy }
     healthcheck:
