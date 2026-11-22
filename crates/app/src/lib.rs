@@ -8,8 +8,10 @@
 #![deny(clippy::float_arithmetic)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod captcha;
 pub mod config;
 pub mod error;
 pub mod health;
 pub mod metrics;
+pub mod ratelimit;
 pub mod telemetry;

@@ -10,14 +10,17 @@
 use std::sync::Arc;
 
 use crate::health;
+use crate::middleware::Hardening;
+use crate::middleware::headers::security_headers;
 use crate::middleware::observe::observe;
+use crate::middleware::rate_limit::rate_limit;
 use app::health::Readiness;
 use app::metrics::Metrics;
 use axum::Router;
-use axum::extract::{Path, RawQuery, Request, State};
-use axum::http::header::{self, HeaderName};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri};
-use axum::middleware::{self, Next};
+use axum::extract::{Path, RawQuery, State};
+use axum::http::header;
+use axum::http::{HeaderMap, StatusCode, Uri};
+use axum::middleware;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::get;
 use ui::i18n::neutral_path;
@@ -72,20 +75,34 @@ impl SsrConfig {
 
 /// The router for every page and asset this crate serves, plus `/healthz` and `/readyz`.
 ///
-/// `metrics` receives the RED measurements of every request; `readiness` backs `/readyz`.
-pub fn router(config: SsrConfig, readiness: Arc<Readiness>, metrics: Arc<Metrics>) -> Router {
+/// `metrics` receives the RED measurements of every request; `readiness` backs `/readyz`;
+/// `hardening` carries the security headers and the page rate limit.
+pub fn router(
+    config: SsrConfig,
+    readiness: Arc<Readiness>,
+    metrics: Arc<Metrics>,
+    hardening: Hardening,
+) -> Router {
+    // Pages and the 404 fallback are rate limited per client IP; assets (a page pulls several) and
+    // the probes are not.
     let pages = Router::new()
         .route("/", get(home))
         .route("/en", get(home))
         .route("/_ui", get(gallery))
         .route("/en/_ui", get(gallery))
-        .route("/assets/{*path}", get(asset))
         .fallback(not_found)
-        .with_state(Arc::new(config));
-    // `observe` is outermost so it times everything, including the security-header layer.
+        .with_state(Arc::new(config))
+        .layer(middleware::from_fn_with_state(hardening.pages, rate_limit));
+    let assets = Router::new().route("/assets/{*path}", get(asset));
+    // `observe` is outermost so it times everything, including the security-header layer; the
+    // headers wrap the limiter so a `429` carries them too.
     pages
+        .merge(assets)
         .merge(health::routes(readiness))
-        .layer(middleware::from_fn(security_headers))
+        .layer(middleware::from_fn_with_state(
+            hardening.headers,
+            security_headers,
+        ))
         .layer(middleware::from_fn_with_state(metrics, observe))
 }
 
@@ -183,35 +200,6 @@ async fn asset(Path(path): Path<String>, RawQuery(query): RawQuery) -> Response 
         .into_response()
 }
 
-/// Everything is first-party: no third-party origins, no inline script or style, no `data:`
-/// images, no framing. Loosening any of this needs a security review (`docs/SECURITY_THREAT_MODEL.md`).
-const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; \
-font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; \
-form-action 'self'; frame-ancestors 'none'";
-
-const SECURITY_HEADERS: [(&str, &str); 5] = [
-    ("content-security-policy", CSP),
-    ("x-content-type-options", "nosniff"),
-    ("referrer-policy", "strict-origin-when-cross-origin"),
-    ("x-frame-options", "DENY"),
-    (
-        "permissions-policy",
-        "camera=(), microphone=(), geolocation=(), payment=()",
-    ),
-];
-
-async fn security_headers(req: Request, next: Next) -> Response {
-    let mut response = next.run(req).await;
-    let headers = response.headers_mut();
-    for (name, value) in SECURITY_HEADERS {
-        headers.insert(
-            HeaderName::from_static(name),
-            HeaderValue::from_static(value),
-        );
-    }
-    response
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -226,6 +214,7 @@ mod tests {
             config,
             Arc::new(Readiness::new(std::time::Duration::from_secs(1))),
             Arc::new(Metrics::new()),
+            Hardening::default(),
         )
     }
 
