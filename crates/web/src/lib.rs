@@ -6,6 +6,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod health;
+pub mod healthcheck;
 pub mod middleware;
 pub mod problem;
 pub mod ssr;

@@ -101,4 +101,39 @@ expect_pass "format! with ordinary text is fine" sqlcheck
 write_rs 'fn f() { let _ = sqlx::query!("SELECT 1 AS one"); }'
 expect_pass "static query! macro is fine" sqlcheck
 
+# --- production compose policy (needs docker compose + jq; skipped where they are absent) --------
+if docker compose version >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  infra_check() { "$root/scripts/check-infra.sh" "$tmp/ws/infra/compose.prod.yml"; }
+  compose_ws() { echo "$tmp/ws/infra/compose.prod.yml"; }
+
+  fresh_copy
+  expect_pass "pristine compose.prod.yml passes check-infra" infra_check
+
+  fresh_copy; sed -i '0,/^  postgres:$/s//  postgres:\n    ports: ["5432:5432"]/' "$(compose_ws)"
+  expect_fail "publishing postgres" 'postgres publishes 5432' infra_check
+
+  fresh_copy; sed -i 's/"127.0.0.1:3000:3000"/"3000:3000"/' "$(compose_ws)"
+  expect_fail "grafana on a public port" 'grafana publishes 3000' infra_check
+
+  fresh_copy; sed -i 's/^  read_only: true$/  read_only: false/' "$(compose_ws)"
+  expect_fail "writable root filesystem" 'read_only must be true' infra_check
+
+  fresh_copy; sed -i 's/^  cap_drop: \[ALL\]$/  cap_drop: [NET_RAW]/' "$(compose_ws)"
+  expect_fail "capabilities not dropped" 'cap_drop must contain ALL' infra_check
+
+  fresh_copy; sed -i 's#image: caddy:2.11.4#image: caddy:latest#' "$(compose_ws)"
+  expect_fail "latest tag" 'must not use :latest' infra_check
+
+  fresh_copy; sed -i 's#^      APP_ENV: production$#      APP_ENV: production\n      API_TOKEN: hunter2#' "$(compose_ws)"
+  expect_fail "secret in environment" 'web sets API_TOKEN' infra_check
+
+  fresh_copy; sed -i 's#^      TRUST_FORWARDED_FOR: "true"$#      TRUST_FORWARDED_FOR: "false"#' "$(compose_ws)"
+  expect_fail "web not trusting the proxy header" 'TRUST_FORWARDED_FOR=false' infra_check
+
+  fresh_copy; sed -i 's#^  app: { internal: true }$#  app: {}#' "$(compose_ws)"
+  expect_fail "app network not internal" 'must be internal' infra_check
+else
+  echo "skipped: compose policy checks (docker compose or jq not available)"
+fi
+
 echo "selftest: $passed checks behaved as expected"

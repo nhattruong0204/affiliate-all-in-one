@@ -1,0 +1,216 @@
+# Production / staging stack for a single VPS (ADR-0009, docs/INFRASTRUCTURE.md §2).
+#
+#   infra/up.sh                      # one command: checks config, creates secrets, starts and waits
+#
+# V0.1 scope (AAO-092): caddy, web, postgres, interim backup, prometheus, grafana.
+# Not here yet: worker (the binary is a stub), otel-collector and loki (V0.5 gate), alertmanager.
+#
+# Policy enforced by scripts/check-infra.sh in CI: read-only root filesystem, all capabilities
+# dropped, no-new-privileges, memory limits, restart policy, only caddy publishes 80/443, every other
+# published port is loopback-only, no secret in `environment`, no `latest` tags.
+name: aao-prod
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  pids_limit: 512
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+networks:
+  # caddy <-> web. Not internal: this is where the published ports and (later) provider egress live.
+  edge: {}
+  # web/backup <-> postgres. No route to or from the internet.
+  app: { internal: true }
+  # prometheus/grafana <-> web:9100. No route to or from the internet.
+  obs: { internal: true }
+  # grafana only: Docker cannot publish a port for a container that sits solely on internal
+  # networks, and grafana's loopback-only admin port (SSH tunnel) needs one.
+  admin: {}
+
+volumes:
+  pgdata: {}
+  backups: {}
+  caddy_data: {}
+  caddy_config: {}
+  prometheus_data: {}
+  grafana_data: {}
+
+# File-backed secrets are mounted at /run/secrets/<name>. Create them with infra/bootstrap/gen-secrets.sh.
+secrets:
+  postgres_password:
+    file: ${AAO_SECRETS_DIR:-./secrets}/postgres_password
+  database_url:
+    file: ${AAO_SECRETS_DIR:-./secrets}/database_url
+  grafana_admin_password:
+    file: ${AAO_SECRETS_DIR:-./secrets}/grafana_admin_password
+
+services:
+  caddy:
+    <<: *hardening
+    image: caddy:2.11.4
+    # Root inside the container (the official image) but with every capability dropped except the
+    # one needed to bind 80/443.
+    cap_add: [NET_BIND_SERVICE]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS (the public domain; ':80' for plain-HTTP smoke tests)}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL (Let's Encrypt account contact)}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs: [/tmp]
+    networks: [edge]
+    depends_on:
+      web: { condition: service_healthy }
+    healthcheck:
+      # The admin endpoint is localhost-only inside the container and never published.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    mem_limit: 256m
+    cpus: 1.0
+
+  web:
+    <<: *hardening
+    image: ${WEB_IMAGE:?set WEB_IMAGE to the web image reference (pinned by digest in production)}
+    environment:
+      APP_ENV: production
+      WEB_BIND: 0.0.0.0:8080
+      # Reachable only from prometheus on the `obs` network. Never published, never proxied.
+      METRICS_BIND: 0.0.0.0:9100
+      DATABASE_URL_FILE: /run/secrets/database_url
+      # Behind our own caddy the TCP peer is always the proxy; use the entry caddy appended.
+      TRUST_FORWARDED_FOR: "true"
+      WEB_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      RATE_LIMIT_PAGES_PER_MINUTE: ${RATE_LIMIT_PAGES_PER_MINUTE:-120}
+      RATE_LIMIT_FORMS_PER_MINUTE: ${RATE_LIMIT_FORMS_PER_MINUTE:-10}
+    secrets: [database_url]
+    tmpfs: [/tmp]
+    networks: [edge, app, obs]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      # Distroless: no shell or curl, so the binary probes itself (/healthz = liveness only).
+      test: ["CMD", "/usr/local/bin/web", "healthcheck"]
+      interval: 15s
+      timeout: 4s
+      retries: 3
+      start_period: 10s
+    mem_limit: 512m
+    cpus: 1.0
+
+  postgres:
+    <<: *hardening
+    image: postgres:17.11
+    # Run as the image's postgres user directly (no root entrypoint, so no capabilities needed).
+    user: "999:999"
+    environment:
+      POSTGRES_USER: aao
+      POSTGRES_DB: aao
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    tmpfs: [/tmp, /var/run/postgresql]
+    networks: [app]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aao -d aao"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    shm_size: 128m
+    mem_limit: 1g
+    cpus: 1.0
+
+  # INTERIM backup (V0.1): a nightly logical dump to a local volume, 7 days kept. It protects
+  # against bad deploys and operator error, NOT against losing the VPS: no encryption, no off-site
+  # copy, no WAL/PITR. AAO-093 replaces it (wal-g, encrypted off-site, automated restore test).
+  backup:
+    <<: *hardening
+    image: postgres:17.11
+    # Root with no capabilities: it owns the freshly created volume, so it can write there.
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/opt/backup/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: aao
+      PGDATABASE: aao
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    secrets: [postgres_password]
+    volumes:
+      - ./backup/backup.sh:/opt/backup/backup.sh:ro
+      - backups:/backups
+    tmpfs: [/tmp]
+    networks: [app]
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 256m
+    cpus: 0.5
+
+  prometheus:
+    <<: *hardening
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.listen-address=:9090
+    volumes:
+      - ./observability/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    tmpfs: [/tmp]
+    networks: [obs]
+    healthcheck:
+      test: ["CMD", "promtool", "check", "healthy", "--url=http://127.0.0.1:9090"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+      start_period: 15s
+    mem_limit: 512m
+    cpus: 1.0
+
+  grafana:
+    <<: *hardening
+    image: grafana/grafana:13.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    secrets: [grafana_admin_password]
+    # Loopback only: reach it with `ssh -L 3000:127.0.0.1:3000 <vps>` (ADR-0009). Not behind caddy.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+    tmpfs: [/tmp]
+    networks: [obs, admin]
+    depends_on:
+      prometheus: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    cpus: 1.0

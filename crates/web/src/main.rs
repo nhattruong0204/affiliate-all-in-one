@@ -8,6 +8,9 @@
 //!   never publish this port.
 //! * `WEB_UI_GALLERY` – `1`/`true` serves the component gallery at `/_ui` (refused in production).
 //! * `WEB_PUBLIC_BASE_URL` – public origin for canonical/`hreflang` links (unset until D-4).
+//!
+//! `web healthcheck` probes the running server's `/healthz` and exits non-zero on failure; it is
+//! what the compose container healthcheck runs (the image has no shell or `curl`).
 
 #![forbid(unsafe_code)]
 
@@ -28,6 +31,11 @@ use web::ssr::{self, SsrConfig};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Container health probe: no configuration, no logging, just an exit status.
+    if std::env::args().nth(1).as_deref() == Some("healthcheck") {
+        return web::healthcheck::run().map_err(anyhow::Error::msg);
+    }
+
     // Configuration errors print to stderr before logging exists, all at once.
     let config = Config::from_env().context("invalid startup configuration")?;
     telemetry::init(&config).context("cannot initialise logging")?;

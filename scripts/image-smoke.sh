@@ -46,6 +46,9 @@ for _ in $(seq 1 30); do
 done
 [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/healthz")" == "200" ]] \
   || { docker logs "$name" >&2; fail "/healthz did not return 200"; }
+# The container health probe (`web healthcheck`) works without a shell: exec runs the binary directly.
+docker exec "$name" /usr/local/bin/web healthcheck \
+  || { docker logs "$name" >&2; fail "'web healthcheck' failed inside the container"; }
 [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/readyz")" == "200" ]] \
   || { docker logs "$name" >&2; fail "/readyz did not return 200 (no database configured)"; }
 [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/metrics")" == "404" ]] \

@@ -1,0 +1,86 @@
+# Run with: promtool test rules alerts_test.yml (CI job `infra`).
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: web down for more than two minutes fires WebDown
+    interval: 1m
+    input_series:
+      - series: 'up{job="web",instance="web:9100"}'
+        values: "1 1 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: WebDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: WebDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: web
+              instance: "web:9100"
+            exp_annotations:
+              summary: "web is not answering Prometheus scrapes"
+
+  - name: 10% of requests failing fires High5xxRate, a healthy site does not
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{method="GET",route="/",status="200"}'
+        values: "0+90x20"
+      - series: 'http_requests_total{method="GET",route="/",status="500"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: High5xxRate
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: High5xxRate
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "more than 2% of requests failed with 5xx for 5 minutes"
+
+  - name: a healthy site fires nothing
+    interval: 1m
+    input_series:
+      - series: 'up{job="web",instance="web:9100"}'
+        values: "1+0x30"
+      - series: 'http_requests_total{method="GET",route="/",status="200"}'
+        values: "0+100x30"
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="0.5"}'
+        values: "0+60x30"
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="+Inf"}'
+        values: "0+60x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: High5xxRate
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HighLatencyP95
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: WebDown
+        exp_alerts: []
+
+  - name: p95 above one second for ten minutes fires HighLatencyP95
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="0.5"}'
+        values: "0+0x30"
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="1"}'
+        values: "0+0x30"
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="5"}'
+        values: "0+60x30"
+      - series: 'http_request_duration_seconds_bucket{method="GET",route="/",le="+Inf"}'
+        values: "0+60x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HighLatencyP95
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "p95 request latency above 1 s for 10 minutes"

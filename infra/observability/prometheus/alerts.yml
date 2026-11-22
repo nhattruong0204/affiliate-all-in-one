@@ -1,0 +1,33 @@
+# Alert rules that can be computed from the metrics that exist today (docs/INFRASTRUCTURE.md §8).
+# V0.1 has no Alertmanager: rules are evaluated and visible in Prometheus and Grafana, and the
+# external uptime monitor is the pager. Rules that need later metrics or exporters are listed in
+# docs/INFRASTRUCTURE.md §8.1 and are added by the issue that introduces the metric.
+groups:
+  - name: aao-web
+    rules:
+      - alert: WebDown
+        expr: up{job="web"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "web is not answering Prometheus scrapes"
+
+      - alert: High5xxRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(http_requests_total[5m])) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "more than 2% of requests failed with 5xx for 5 minutes"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 request latency above 1 s for 10 minutes"

@@ -182,6 +182,8 @@ jobs:
           done
       - name: Image smoke (size, UID 10001, no shell, /healthz, /readyz)
         run: scripts/image-smoke.sh aao-web:ci aao-worker:ci
+      - name: Production stack smoke (compose up from scratch; headers, limits, metrics, backup)
+        run: scripts/stack-smoke.sh aao-web:ci
       - name: Trivy (fail on fixable HIGH/CRITICAL)
         run: |
           trivy="$(scripts/install-trivy.sh)"
@@ -190,6 +192,40 @@ jobs:
               --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
               --ignorefile .trivyignore.yaml "$image"
           done
+
+  infra:
+    name: infra
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: shellcheck
+        run: shellcheck infra/up.sh infra/bootstrap/*.sh infra/backup/*.sh scripts/check-infra.sh scripts/stack-smoke.sh
+      - name: Compose policy (read-only rootfs, capabilities, ports, secrets, tags)
+        run: scripts/check-infra.sh
+      - name: Caddyfile, Prometheus config, alert rules and their unit tests
+        run: |
+          infra/bootstrap/gen-secrets.sh "$RUNNER_TEMP/secrets" >/dev/null
+          export AAO_SECRETS_DIR="$RUNNER_TEMP/secrets" WEB_IMAGE=registry.invalid/aao-web:test \
+                 SITE_ADDRESS=example.invalid ACME_EMAIL=ops@example.invalid
+          rendered="$(docker compose -f infra/compose.prod.yml config --format json)"
+          caddy_image="$(jq -r .services.caddy.image <<<"$rendered")"
+          prom_image="$(jq -r .services.prometheus.image <<<"$rendered")"
+          docker run --rm -e SITE_ADDRESS -e ACME_EMAIL \
+            -v "$PWD/infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" "$caddy_image" \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          promtool() { docker run --rm --entrypoint promtool -v "$PWD/infra/observability/prometheus:/etc/prometheus:ro" "$prom_image" "$@"; }
+          promtool check config /etc/prometheus/prometheus.yml
+          promtool check rules /etc/prometheus/alerts.yml
+          promtool test rules /etc/prometheus/alerts_test.yml
+      - name: Grafana provisioning files are valid JSON/YAML
+        run: |
+          jq empty infra/observability/grafana/dashboards/*.json
+          python3 -c "import sys,yaml;[yaml.safe_load(open(f)) for f in sys.argv[1:]]" \
+            infra/observability/grafana/provisioning/*/*.yml
 
   supply-chain:
     name: supply-chain
