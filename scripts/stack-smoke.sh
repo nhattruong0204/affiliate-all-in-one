@@ -30,6 +30,7 @@ cleanup() {
 trap cleanup EXIT
 
 http_code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+wait_for_quiet() { local attempts=$1; shift; for _ in $(seq 1 "$attempts"); do "$@" >/dev/null 2>&1 && return 0; sleep 2; done; return 1; }
 wait_for() { # description, attempts, command...
   local desc=$1 attempts=$2; shift 2
   for _ in $(seq 1 "$attempts"); do "$@" >/dev/null 2>&1 && return 0; sleep 2; done
@@ -78,7 +79,15 @@ rules="$("${compose[@]}" exec -T prometheus promtool query instant http://127.0.
 echo "== grafana has the provisioned dashboard"
 grafana_pw="$(<"$AAO_SECRETS_DIR/grafana_admin_password")"
 dash() { [[ "$(http_code -u "admin:${grafana_pw}" http://127.0.0.1:3000/api/dashboards/uid/aao-red)" == "200" ]]; }
-wait_for "grafana dashboard aao-red" 30 dash
+if ! wait_for_quiet 30 dash; then
+  echo "--- grafana diagnostics" >&2
+  curl -s -u "admin:${grafana_pw}" -w '\nHTTP %{http_code}\n' http://127.0.0.1:3000/api/dashboards/uid/aao-red >&2 || true
+  curl -s -u "admin:${grafana_pw}" -w '\nHTTP %{http_code}\n' 'http://127.0.0.1:3000/api/search?query=' >&2 || true
+  curl -s -u "admin:${grafana_pw}" -w '\nHTTP %{http_code}\n' http://127.0.0.1:3000/api/datasources >&2 || true
+  "${compose[@]}" logs --no-color grafana 2>&1 | grep -iE 'provision|dashboard|datasource|error|denied|permission' | grep -v 'angular\|plugin\|bleve\|resource-search' | tail -40 >&2 || true
+  "${compose[@]}" exec -T grafana ls -la /etc/grafana/provisioning /etc/grafana/provisioning/dashboards /etc/grafana/dashboards >&2 || true
+  fail "grafana dashboard aao-red was not provisioned"
+fi
 [[ "$(http_code http://127.0.0.1:3000/api/dashboards/uid/aao-red)" == "401" ]] || fail "grafana must require login"
 
 echo "== backup wrote a restorable dump"
