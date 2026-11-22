@@ -117,5 +117,6 @@ histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_
 * Set `APP_ENV=production`, `DATABASE_URL_FILE=/run/secrets/database_url`.
 * `METRICS_BIND=0.0.0.0:9100` inside the container network; **do not publish the port** and do not
   proxy `/metrics` in Caddy. Scrape it from Prometheus on the compose network.
-* Container healthcheck → `/healthz`; Caddy active health check and the uptime monitor → `/readyz`.
+* Container healthcheck → `web healthcheck` (probes `/healthz`, no shell needed); Caddy's active health check → `/healthz` (single upstream: see `docs/INFRASTRUCTURE.md` §2.1); the external uptime monitor → `/readyz`.
+* Prometheus scrapes `web:9100` over the internal `obs` network (`infra/observability/prometheus/prometheus.yml`); the stack is in `infra/` (AAO-092).
 * Ship container stdout (JSON) to Loki; query by `trace_id`.
